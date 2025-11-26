@@ -123,7 +123,7 @@ export class FundManagerModel {
       }
       return await this.collection.findOne({
         _id: new ObjectId(id),
-      } as Filter<FundManager>);
+      } as any);
     } catch (error) {
       console.error('Error in findByMongoId:', error);
       return null;

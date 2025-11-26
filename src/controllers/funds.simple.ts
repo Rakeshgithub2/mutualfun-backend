@@ -276,8 +276,8 @@ export const getFundById = async (
       ratings: fund.ratings,
 
       // Additional Info
-      benchmark: fund.benchmark,
-      portfolioTurnover: fund.portfolioTurnover,
+      // benchmark: fund.benchmark, // Not in schema
+      // portfolioTurnover: fund.portfolioTurnover, // Not in schema
 
       // Metadata
       popularity: fund.popularity,

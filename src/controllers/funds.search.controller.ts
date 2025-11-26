@@ -51,7 +51,7 @@ export const searchFunds = async (
         typeof fund.fundManager === 'object' &&
         'name' in fund.fundManager
       ) {
-        managerName = fund.fundManager.name;
+        managerName = (fund.fundManager as any).name;
       }
 
       return {

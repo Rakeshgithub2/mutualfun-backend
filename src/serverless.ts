@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import app from './index';
-import { MongoDB } from './db/mongodb';
+import { mongodb } from './db/mongodb';
 
 // Cache for serverless
 let isConnected = false;
@@ -11,7 +11,6 @@ const connectDB = async (): Promise<void> => {
   }
 
   try {
-    const mongodb = MongoDB.getInstance();
     if (!mongodb.isConnected()) {
       await mongodb.connect();
       isConnected = true;
