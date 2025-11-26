@@ -1,0 +1,535 @@
+import { OAuth2Client } from 'google-auth-library';
+import * as jwt from 'jsonwebtoken';
+import * as bcrypt from 'bcrypt';
+import { Db } from 'mongodb';
+import { User } from '../db/schemas';
+import { randomUUID } from 'crypto';
+
+const client = new OAuth2Client(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET
+);
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_REFRESH_SECRET =
+  process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
+const JWT_EXPIRES_IN = '15m'; // Short-lived access token as per security spec
+const REFRESH_TOKEN_EXPIRES_IN = '7d';
+const BCRYPT_ROUNDS = 12; // Strong password hashing
+
+interface GoogleTokenPayload {
+  sub: string; // Google ID
+  email: string;
+  email_verified: boolean;
+  name: string;
+  given_name: string;
+  family_name: string;
+  picture?: string;
+}
+
+interface JWTPayload {
+  userId: string;
+  email: string;
+  name: string;
+  type: 'access' | 'refresh';
+}
+
+export class AuthService {
+  private db: Db;
+
+  constructor(db: Db) {
+    this.db = db;
+  }
+
+  /**
+   * Verify Google ID token and return user info
+   */
+  async verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload> {
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+
+      const payload = ticket.getPayload();
+      if (!payload) {
+        throw new Error('Invalid token payload');
+      }
+
+      // Validate email verification as per security spec
+      if (!payload.email_verified) {
+        throw new Error('Email not verified by Google');
+      }
+
+      return {
+        sub: payload.sub,
+        email: payload.email!,
+        email_verified: payload.email_verified,
+        name: payload.name || '',
+        given_name: payload.given_name || '',
+        family_name: payload.family_name || '',
+        picture: payload.picture,
+      };
+    } catch (error: any) {
+      throw new Error(`Google token verification failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Register new user with email and password
+   */
+  async registerWithEmail(
+    email: string,
+    password: string,
+    name: string,
+    ip: string,
+    userAgent: string
+  ): Promise<User> {
+    const usersCollection = this.db.collection<User>('users');
+
+    // Check if user already exists
+    const existingUser = await usersCollection.findOne({ email });
+    if (existingUser) {
+      throw new Error('User with this email already exists');
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      throw new Error('Password must be at least 8 characters long');
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
+
+    // Split name into first and last name
+    const nameParts = name.trim().split(' ');
+    const firstName = nameParts[0] || name;
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    // Create new user
+    const newUser: User = {
+      userId: randomUUID(),
+      email,
+      password: hashedPassword,
+      emailVerified: false, // Email verification required
+      authMethod: 'email',
+      name,
+      firstName,
+      lastName,
+      preferences: {
+        theme: 'light',
+        language: 'en',
+        currency: 'INR',
+        riskProfile: 'moderate',
+        notifications: {
+          email: true,
+          push: true,
+          priceAlerts: true,
+          newsAlerts: true,
+        },
+      },
+      kyc: {
+        status: 'pending',
+      },
+      subscription: {
+        plan: 'free',
+        autoRenew: false,
+      },
+      refreshTokens: [],
+      lastLogin: new Date(),
+      loginHistory: [
+        {
+          timestamp: new Date(),
+          ip,
+          userAgent,
+        },
+      ],
+      isActive: true,
+      isBlocked: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await usersCollection.insertOne(newUser);
+    return newUser;
+  }
+
+  /**
+   * Login user with email and password
+   */
+  async loginWithEmail(
+    email: string,
+    password: string,
+    ip: string,
+    userAgent: string
+  ): Promise<User> {
+    const usersCollection = this.db.collection<User>('users');
+
+    // Find user by email
+    const user = await usersCollection.findOne({
+      email,
+      isActive: true,
+      isBlocked: false,
+    });
+
+    if (!user) {
+      throw new Error('Invalid email or password');
+    }
+
+    // Check if user has password (not Google-only user)
+    if (!user.password) {
+      throw new Error(
+        'This account was created with Google. Please sign in with Google.'
+      );
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new Error('Invalid email or password');
+    }
+
+    // Update last login
+    await usersCollection.updateOne(
+      { userId: user.userId },
+      {
+        $set: {
+          lastLogin: new Date(),
+          updatedAt: new Date(),
+        },
+        $push: {
+          loginHistory: {
+            $each: [
+              {
+                timestamp: new Date(),
+                ip,
+                userAgent,
+              },
+            ],
+            $slice: -50,
+          },
+        },
+      }
+    );
+
+    return user;
+  }
+
+  /**
+   * Create or update user from Google profile
+   */
+  async findOrCreateUser(
+    googleData: GoogleTokenPayload,
+    ip: string,
+    userAgent: string
+  ): Promise<User> {
+    const usersCollection = this.db.collection<User>('users');
+
+    // Check if user exists by Google ID
+    let user = await usersCollection.findOne({ googleId: googleData.sub });
+
+    if (user) {
+      // Update existing user
+      const updateData = {
+        name: googleData.name,
+        firstName: googleData.given_name,
+        lastName: googleData.family_name,
+        picture: googleData.picture,
+        emailVerified: googleData.email_verified,
+        lastLogin: new Date(),
+        updatedAt: new Date(),
+      };
+
+      await usersCollection.updateOne(
+        { googleId: googleData.sub },
+        {
+          $set: updateData,
+          $push: {
+            loginHistory: {
+              $each: [
+                {
+                  timestamp: new Date(),
+                  ip,
+                  userAgent,
+                },
+              ],
+              $slice: -50,
+            },
+          },
+        }
+      );
+
+      user = await usersCollection.findOne({ googleId: googleData.sub });
+      return user!;
+    }
+
+    // Check if user exists by email (may have registered with email/password)
+    user = await usersCollection.findOne({ email: googleData.email });
+
+    if (user) {
+      // Link Google account to existing email/password account
+      await usersCollection.updateOne(
+        { userId: user.userId },
+        {
+          $set: {
+            googleId: googleData.sub,
+            authMethod: 'both',
+            emailVerified: true, // Google verifies email
+            picture: googleData.picture,
+            lastLogin: new Date(),
+            updatedAt: new Date(),
+          },
+          $push: {
+            loginHistory: {
+              $each: [
+                {
+                  timestamp: new Date(),
+                  ip,
+                  userAgent,
+                },
+              ],
+              $slice: -50,
+            },
+          },
+        }
+      );
+
+      user = await usersCollection.findOne({ userId: user.userId });
+      return user!;
+    }
+
+    // Create new user with Google
+    const newUser: User = {
+      userId: randomUUID(),
+      googleId: googleData.sub,
+      email: googleData.email,
+      emailVerified: googleData.email_verified,
+      authMethod: 'google',
+      name: googleData.name,
+      firstName: googleData.given_name,
+      lastName: googleData.family_name,
+      picture: googleData.picture,
+      preferences: {
+        theme: 'light',
+        language: 'en',
+        currency: 'INR',
+        riskProfile: 'moderate',
+        notifications: {
+          email: true,
+          push: true,
+          priceAlerts: true,
+          newsAlerts: true,
+        },
+      },
+      kyc: {
+        status: 'pending',
+      },
+      subscription: {
+        plan: 'free',
+        autoRenew: false,
+      },
+      refreshTokens: [],
+      lastLogin: new Date(),
+      loginHistory: [
+        {
+          timestamp: new Date(),
+          ip,
+          userAgent,
+        },
+      ],
+      isActive: true,
+      isBlocked: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await usersCollection.insertOne(newUser);
+    return newUser;
+  }
+
+  /**
+   * Generate JWT access token
+   */
+  generateAccessToken(user: User): string {
+    const payload: JWTPayload = {
+      userId: user.userId,
+      email: user.email,
+      name: user.name,
+      type: 'access',
+    };
+
+    return jwt.sign(payload, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
+  }
+
+  /**
+   * Generate JWT refresh token
+   */
+  generateRefreshToken(user: User): string {
+    const payload: JWTPayload = {
+      userId: user.userId,
+      email: user.email,
+      name: user.name,
+      type: 'refresh',
+    };
+
+    return jwt.sign(payload, JWT_REFRESH_SECRET, {
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+    });
+  }
+
+  /**
+   * Save refresh token to database
+   */
+  async saveRefreshToken(userId: string, refreshToken: string): Promise<void> {
+    const usersCollection = this.db.collection<User>('users');
+
+    await usersCollection.updateOne(
+      { userId },
+      {
+        $push: { refreshTokens: refreshToken },
+        $slice: { refreshTokens: -5 }, // Keep only last 5 refresh tokens
+      }
+    );
+  }
+
+  /**
+   * Verify JWT access token
+   */
+  verifyAccessToken(token: string): JWTPayload {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+      if (decoded.type !== 'access') {
+        throw new Error('Invalid token type');
+      }
+      return decoded;
+    } catch (error: any) {
+      throw new Error(`Token verification failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Verify JWT refresh token
+   */
+  verifyRefreshToken(token: string): JWTPayload {
+    try {
+      const decoded = jwt.verify(token, JWT_REFRESH_SECRET) as JWTPayload;
+      if (decoded.type !== 'refresh') {
+        throw new Error('Invalid token type');
+      }
+      return decoded;
+    } catch (error: any) {
+      throw new Error(`Refresh token verification failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Validate refresh token against database
+   */
+  async validateRefreshToken(
+    userId: string,
+    refreshToken: string
+  ): Promise<boolean> {
+    const usersCollection = this.db.collection<User>('users');
+    const user = await usersCollection.findOne({
+      userId,
+      refreshTokens: refreshToken,
+      isActive: true,
+      isBlocked: false,
+    });
+
+    return !!user;
+  }
+
+  /**
+   * Revoke refresh token
+   */
+  async revokeRefreshToken(
+    userId: string,
+    refreshToken: string
+  ): Promise<void> {
+    const usersCollection = this.db.collection<User>('users');
+
+    await usersCollection.updateOne(
+      { userId },
+      { $pull: { refreshTokens: refreshToken } }
+    );
+  }
+
+  /**
+   * Revoke all refresh tokens for a user
+   */
+  async revokeAllRefreshTokens(userId: string): Promise<void> {
+    const usersCollection = this.db.collection<User>('users');
+
+    await usersCollection.updateOne(
+      { userId },
+      { $set: { refreshTokens: [] } }
+    );
+  }
+
+  /**
+   * Get user by userId
+   */
+  async getUserById(userId: string): Promise<User | null> {
+    const usersCollection = this.db.collection<User>('users');
+    return await usersCollection.findOne({
+      userId,
+      isActive: true,
+      isBlocked: false,
+    });
+  }
+
+  /**
+   * Get user by email
+   */
+  async getUserByEmail(email: string): Promise<User | null> {
+    const usersCollection = this.db.collection<User>('users');
+    return await usersCollection.findOne({
+      email,
+      isActive: true,
+      isBlocked: false,
+    });
+  }
+
+  /**
+   * Update user profile
+   */
+  async updateUserProfile(
+    userId: string,
+    updates: Partial<User>
+  ): Promise<User | null> {
+    const usersCollection = this.db.collection<User>('users');
+
+    await usersCollection.updateOne(
+      { userId },
+      {
+        $set: {
+          ...updates,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    return await this.getUserById(userId);
+  }
+
+  /**
+   * Delete user account (soft delete)
+   */
+  async deleteUser(userId: string): Promise<void> {
+    const usersCollection = this.db.collection<User>('users');
+
+    await usersCollection.updateOne(
+      { userId },
+      {
+        $set: {
+          isActive: false,
+          refreshTokens: [],
+          updatedAt: new Date(),
+        },
+      }
+    );
+  }
+}
