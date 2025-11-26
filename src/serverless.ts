@@ -24,11 +24,30 @@ const connectDB = async (): Promise<void> => {
 
 // For Vercel serverless - proper typing
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Connect to DB before processing request
-  await connectDB();
+  try {
+    // Connect to DB before processing request
+    await connectDB();
 
-  // Pass request to Express app
-  return app(req, res);
+    // Pass request to Express app using proper method
+    // Express apps need to be invoked as middleware
+    return new Promise((resolve, reject) => {
+      app(req as any, res as any, (err: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(undefined);
+        }
+      });
+    });
+  } catch (error: any) {
+    console.error('❌ Serverless function error:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
 
 // Also export the app for local development
