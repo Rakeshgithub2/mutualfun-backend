@@ -117,7 +117,7 @@ export const getFundManagerByFundId = async (
       fund.fundManager &&
       typeof fund.fundManager === 'object' &&
       fund.fundManager !== null &&
-      'name' in fund.fundManager
+      typeof (fund.fundManager as any).name !== 'undefined'
     ) {
       console.log(
         '✅ Using embedded fund manager data:',

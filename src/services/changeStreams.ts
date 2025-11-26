@@ -61,7 +61,7 @@ export const startWatchlistChangeStream = async () => {
         if (userId) {
           // Fetch updated watchlist for this user
           const watchlistItems = await collection
-            .find({ userId: mongodb.toObjectId(userId) })
+            .find({ userId: userId })
             .toArray();
 
           // Emit to user's socket room
