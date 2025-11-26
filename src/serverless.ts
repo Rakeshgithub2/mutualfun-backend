@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import app from './index';
+import app from './app';
 import { mongodb } from './db/mongodb';
 
-// Cache for serverless
+// Cache for serverless - maintain connection across invocations
 let isConnected = false;
 
 const connectDB = async (): Promise<void> => {
@@ -18,37 +18,58 @@ const connectDB = async (): Promise<void> => {
     }
   } catch (error) {
     console.error('❌ MongoDB connection error:', error);
-    // Continue anyway - some endpoints don't need DB
+    // Continue anyway - some endpoints might not need DB
   }
 };
 
-// For Vercel serverless - proper typing
+// Serverless handler for Vercel
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // Connect to DB before processing request
+    // Ensure DB is connected
     await connectDB();
 
-    // Pass request to Express app using proper method
-    // Express apps need to be invoked as middleware
-    return new Promise((resolve, reject) => {
+    // Handle the request with Express app
+    // We need to wrap this properly for serverless
+    await new Promise<void>((resolve, reject) => {
+      // Set a flag to track if response was sent
+      let responseSent = false;
+
+      // Override res.end to know when response is complete
+      const originalEnd = res.end.bind(res);
+      res.end = function(...args: any[]) {
+        if (!responseSent) {
+          responseSent = true;
+          originalEnd(...args);
+          resolve();
+        }
+        return res;
+      } as any;
+
+      // Call Express app
       app(req as any, res as any, (err: any) => {
-        if (err) {
+        if (err && !responseSent) {
+          responseSent = true;
           reject(err);
-        } else {
-          resolve(undefined);
+        } else if (!responseSent) {
+          // If no error and response not sent, something went wrong
+          responseSent = true;
+          resolve();
         }
       });
     });
   } catch (error: any) {
     console.error('❌ Serverless function error:', error);
-    return res.status(500).json({
-      error: 'Internal server error',
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-      timestamp: new Date().toISOString(),
-    });
+    
+    // Only send error response if headers haven't been sent
+    if (!res.headersSent) {
+      return res.status(500).json({
+        error: 'Internal server error',
+        message: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 }
 
-// Also export the app for local development
+// Also export the app
 export { app };
