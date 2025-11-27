@@ -37,8 +37,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API routes
-app.use('/', routes);
+// API routes - mounted at /api prefix
+app.use('/api', routes);
 
 // Error handling
 app.use(errorHandler);
