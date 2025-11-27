@@ -37,6 +37,21 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Diagnostic endpoint for debugging
+app.get('/api/debug', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    config: {
+      hasDatabaseUrl: !!process.env.DATABASE_URL,
+      hasJwtSecret: !!process.env.JWT_SECRET,
+      hasJwtRefreshSecret: !!process.env.JWT_REFRESH_SECRET,
+      nodeEnv: process.env.NODE_ENV,
+    },
+  });
+});
+
 // API routes - mounted at /api prefix
 app.use('/api', routes);
 

@@ -21,14 +21,24 @@ class MongoDB {
 
   public async connect(): Promise<void> {
     try {
+      // If already connected, just return
+      if (this.db) {
+        console.log('✅ MongoDB already connected');
+        return;
+      }
+
+      console.log('🔄 Connecting to MongoDB...');
       await this.client.connect();
+      
       // Extract database name from URL
       const dbName =
         DATABASE_URL.split('/').pop()?.split('?')[0] || 'mutual_funds_db';
       this.db = this.client.db(dbName);
-      console.log('✅ MongoDB connected successfully');
+      
+      console.log(`✅ MongoDB connected successfully to database: ${dbName}`);
     } catch (error) {
       console.error('❌ MongoDB connection failed:', error);
+      this.db = null;
       throw error;
     }
   }

@@ -6,19 +6,22 @@ import { mongodb } from './db/mongodb';
 let isConnected = false;
 
 const connectDB = async (): Promise<void> => {
-  if (isConnected) {
+  // Always check if connected, don't rely on cached flag alone
+  if (mongodb.isConnected()) {
     return;
   }
 
   try {
-    if (!mongodb.isConnected()) {
-      await mongodb.connect();
-      isConnected = true;
-      console.log('✅ MongoDB connected for serverless function');
-    }
+    console.log('🔄 Attempting MongoDB connection...');
+    console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    
+    await mongodb.connect();
+    isConnected = true;
+    console.log('✅ MongoDB connected for serverless function');
   } catch (error) {
     console.error('❌ MongoDB connection error:', error);
-    // Continue anyway - some endpoints might not need DB
+    isConnected = false;
+    throw error; // Don't continue if DB connection fails
   }
 };
 
