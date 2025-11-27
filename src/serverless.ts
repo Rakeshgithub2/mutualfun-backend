@@ -14,7 +14,7 @@ const connectDB = async (): Promise<void> => {
   try {
     console.log('🔄 Attempting MongoDB connection...');
     console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
-    
+
     await mongodb.connect();
     isConnected = true;
     console.log('✅ MongoDB connected for serverless function');
