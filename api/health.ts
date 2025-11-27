@@ -1,10 +1,20 @@
 // Minimal test endpoint for Vercel debugging
 export default function handler(req: any, res: any) {
   try {
-    res.setHeader(
-      'Access-Control-Allow-Origin',
-      'https://mf-frontend-coral.vercel.app'
-    );
+    // Set CORS headers dynamically
+    const allowedOrigins = [
+      'https://mf-frontend-coral.vercel.app',
+      'https://mutual-fun-frontend-osed.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:5001',
+      'http://localhost:3001',
+    ];
+
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',

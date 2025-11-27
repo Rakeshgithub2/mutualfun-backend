@@ -2,11 +2,20 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Main serverless handler - routes all API requests to Express app
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Set CORS headers
-  res.setHeader(
-    'Access-Control-Allow-Origin',
-    'https://mf-frontend-coral.vercel.app'
-  );
+  // Set CORS headers dynamically based on origin
+  const allowedOrigins = [
+    'https://mf-frontend-coral.vercel.app',
+    'https://mutual-fun-frontend-osed.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5001',
+    'http://localhost:3001',
+  ];
+
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
   res.setHeader(
     'Access-Control-Allow-Methods',
     'GET, POST, PUT, DELETE, OPTIONS'

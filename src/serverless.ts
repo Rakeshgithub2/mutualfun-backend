@@ -36,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Override res.end to know when response is complete
       const originalEnd = res.end.bind(res);
-      res.end = function(...args: any[]) {
+      res.end = function (...args: any[]) {
         if (!responseSent) {
           responseSent = true;
           originalEnd(...args);
@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error: any) {
     console.error('❌ Serverless function error:', error);
-    
+
     // Only send error response if headers haven't been sent
     if (!res.headersSent) {
       return res.status(500).json({
