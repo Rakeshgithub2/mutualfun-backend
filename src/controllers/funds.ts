@@ -12,6 +12,7 @@ import {
 const getFundsSchema = z.object({
   type: z.string().optional(),
   category: z.string().optional(),
+  subCategory: z.string().optional(),
   q: z.string().optional(), // search query
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(10),
@@ -29,12 +30,12 @@ export const getFunds = async (
 ): Promise<Response> => {
   try {
     console.log('📥 GET /funds request received');
-    const { type, category, q, page, limit, sort } = getFundsSchema.parse(
-      req.query
-    );
+    const { type, category, subCategory, q, page, limit, sort } =
+      getFundsSchema.parse(req.query);
     console.log('✅ Request params validated:', {
       type,
       category,
+      subCategory,
       q,
       page,
       limit,
@@ -68,6 +69,10 @@ export const getFunds = async (
       where.category = category;
     }
 
+    if (subCategory) {
+      where.subCategory = subCategory;
+    }
+
     if (q) {
       where.OR = [
         { name: { contains: q, mode: 'insensitive' } },
@@ -91,6 +96,7 @@ export const getFunds = async (
         name: true,
         type: true,
         category: true,
+        subCategory: true,
         benchmark: true,
         expenseRatio: true,
         inceptionDate: true,

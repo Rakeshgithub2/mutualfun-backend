@@ -56,6 +56,7 @@ export const addToWatchlist = async (
             name: true,
             type: true,
             category: true,
+            subCategory: true,
           },
         },
       },
@@ -166,6 +167,7 @@ export const getWatchlist = async (
             name: true,
             type: true,
             category: true,
+            subCategory: true,
             expenseRatio: true,
             performances: {
               orderBy: { date: 'desc' },

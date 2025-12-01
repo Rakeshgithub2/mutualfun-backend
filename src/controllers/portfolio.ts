@@ -318,6 +318,7 @@ export const getPortfolioSummary = async (
           fundId: item.fundId,
           fundName: item.fund.name,
           category: item.fund.category,
+          subCategory: item.fund.subCategory,
           units: item.units,
           nav: latestNav,
           invested: item.investedAmount,
