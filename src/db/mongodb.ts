@@ -28,11 +28,31 @@ class MongoDB {
       }
 
       console.log('🔄 Connecting to MongoDB...');
+      console.log(
+        '📍 Using DATABASE_URL:',
+        DATABASE_URL.replace(/:[^:@]+@/, ':***@')
+      ); // Hide password
+
       await this.client.connect();
 
       // Extract database name from URL
-      const dbName =
-        DATABASE_URL.split('/').pop()?.split('?')[0] || 'mutual_funds_db';
+      let dbName = 'mutual_funds_db'; // Default
+
+      // For Atlas URLs, extract the database name from the path
+      if (DATABASE_URL.includes('mongodb+srv://')) {
+        // Pattern: mongodb+srv://user:pass@host/dbname?params
+        const match = DATABASE_URL.match(/mongodb\+srv:\/\/[^\/]+\/([^?]+)/);
+        if (match && match[1]) {
+          dbName = match[1];
+        }
+      } else {
+        // For local MongoDB URLs
+        const extracted = DATABASE_URL.split('/').pop()?.split('?')[0];
+        if (extracted) {
+          dbName = extracted;
+        }
+      }
+
       this.db = this.client.db(dbName);
 
       console.log(`✅ MongoDB connected successfully to database: ${dbName}`);
