@@ -203,9 +203,14 @@ export const getFundById = async (
       return res.status(404).json({ error: 'Fund not found' });
     }
 
-    // Get manager details if fundManagerId exists
+    // Get manager details - check fundManagerDetails first, then fundManagerId
     let managerInfo = null;
-    if (fund.fundManagerId) {
+
+    // Check if fund has embedded manager details
+    if ((fund as any).fundManagerDetails) {
+      managerInfo = (fund as any).fundManagerDetails;
+    } else if (fund.fundManagerId) {
+      // Fallback to fetching from FundManager collection
       const managerModel = FundManagerModel.getInstance();
       const manager = await managerModel.findById(fund.fundManagerId);
 
