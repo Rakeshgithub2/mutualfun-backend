@@ -212,13 +212,24 @@ export const getFundById = async (
       if (manager) {
         managerInfo = {
           id: manager._id,
+          managerId: manager.managerId,
           name: manager.name,
-          experience: manager.experience,
-          designation: manager.designation,
+          bio: manager.bio || '',
+          experience: manager.experience || 0,
+          qualification: manager.qualification || [],
+          designation: manager.designation || '',
+          currentFundHouse: manager.currentFundHouse || fund.fundHouse,
+          joinedDate: manager.joinedDate,
           fundsManaged: manager.fundsManaged?.length || 0,
-          totalAum: manager.totalAumManaged || 0,
-          avgReturn: manager.averageReturns?.threeYear || 0,
-          bio: manager.bio,
+          totalAumManaged: manager.totalAumManaged || 0,
+          averageReturns: manager.averageReturns || {
+            oneYear: 0,
+            threeYear: 0,
+            fiveYear: 0,
+          },
+          awards: manager.awards || [],
+          linkedin: manager.linkedin,
+          twitter: manager.twitter,
         };
       }
     }
@@ -256,20 +267,28 @@ export const getFundById = async (
       // Risk Metrics
       riskMetrics: fund.riskMetrics,
 
-      // Top Holdings (top 15 real companies)
+      // Top Holdings (top 15 real companies) - Ensure we have data
       topHoldings: (fund.holdings || []).slice(0, 15).map((h) => ({
         name: h.name,
-        ticker: h.ticker,
+        ticker: h.ticker || '',
         percentage: h.percentage,
-        sector: h.sector,
-        value: h.value,
+        sector: h.sector || 'Other',
+        value: h.value || 0,
+        quantity: h.quantity || 0,
       })),
+      holdingsCount: (fund.holdings || []).length,
 
-      // Sector Allocation
-      sectorAllocation: fund.sectorAllocation,
+      // Sector Allocation - Ensure we have data for donut chart
+      sectorAllocation: (fund.sectorAllocation || []).map((s) => ({
+        sector: s.sector,
+        percentage: s.percentage,
+        value: ((fund.aum || 0) * s.percentage) / 100, // Calculate value from AUM
+      })),
+      sectorAllocationCount: (fund.sectorAllocation || []).length,
 
-      // Manager Info
+      // Manager Info - Enhanced details
       fundManager: fund.fundManager,
+      fundManagerId: fund.fundManagerId,
       managerDetails: managerInfo,
 
       // Ratings
