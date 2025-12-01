@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 
 async function checkCategories() {
   try {
-    await mongoose.connect('mongodb://127.0.0.1:27017/mutualfunds');
+    await mongoose.connect(
+      'mongodb+srv://rakeshd01042024_db_user:<db_password>@mutualfunds.l7zeno9.mongodb.net/?appName=mutualfunds'
+    );
 
     const Fund = require('./src/models/Fund');
 

@@ -1,7 +1,9 @@
 const { MongoClient } = require('mongodb');
 
 async function checkUsers() {
-  const client = new MongoClient('mongodb://localhost:27017');
+  const client = new MongoClient(
+    'mongodb+srv://rakeshd01042024_db_user:<db_password>@mutualfunds.l7zeno9.mongodb.net/?appName=mutualfunds'
+  );
 
   try {
     await client.connect();

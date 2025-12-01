@@ -1,6 +1,7 @@
 const { MongoClient } = require('mongodb');
 
-const uri = 'mongodb://localhost:27017/mutual_funds_db';
+const uri =
+  'mongodb+srv://rakeshd01042024_db_user:<db_password>@mutualfunds.l7zeno9.mongodb.net/?appName=mutualfunds';
 
 async function addMoreCommodityFunds() {
   const client = new MongoClient(uri);

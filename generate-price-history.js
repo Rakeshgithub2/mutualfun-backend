@@ -1,6 +1,7 @@
 const { MongoClient, ObjectId } = require('mongodb');
 
-const uri = 'mongodb://localhost:27017';
+const uri =
+  'mongodb+srv://rakeshd01042024_db_user:<db_password>@mutualfunds.l7zeno9.mongodb.net/?appName=mutualfunds';
 const client = new MongoClient(uri);
 
 // Generate realistic price history for each fund
