@@ -47,11 +47,11 @@ For Next.js, use `NEXT_PUBLIC_` prefix instead of `REACT_APP_`.
 ### Google OAuth Configuration:
 
 - **Client ID**: `336417139932-cofvfoqgqch4uub4kt9krimj1mhosilc.apps.googleusercontent.com`
-- **Authorized JavaScript origins**:
-  - `http://localhost:5001`
-  - `https://mutual-fun-frontend-osed.vercel.app`
-- **Authorized redirect URIs**:
-  - `http://localhost:5001/api/auth/google/callback`
+- **Authorized JavaScript origins** (in Google Cloud Console):
+  - `http://localhost:5001` (your frontend)
+  - `https://mutual-fun-frontend-osed.vercel.app` (production frontend)
+- **Authorized redirect URIs** (in Google Cloud Console):
+  - `http://localhost:3002/api/auth/google/callback` (backend callback - NOT frontend!)
 
 ---
 
