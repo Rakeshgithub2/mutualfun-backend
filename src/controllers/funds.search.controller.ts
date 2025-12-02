@@ -112,7 +112,61 @@ export const getFundManagerByFundId = async (
       return res.status(404).json({ error: 'Fund not found' });
     }
 
-    // Check if fund has embedded manager object
+    // Check if fund has fundManagerDetails (new structure)
+    if ((fund as any).fundManagerDetails) {
+      const managerDetails = (fund as any).fundManagerDetails;
+      console.log('✅ Using fundManagerDetails data:', managerDetails.name);
+
+      // Return manager details in expected format
+      const formattedManager = {
+        id: null,
+        managerId: null,
+        name: managerDetails.name || 'N/A',
+        bio: managerDetails.bio || 'No bio available',
+        experience: managerDetails.experience || 0,
+        qualification: managerDetails.qualification || [],
+        currentFundHouse: managerDetails.fundHouse || fund.fundHouse,
+        designation: managerDetails.designation || 'Fund Manager',
+        specialization: managerDetails.specialization || null,
+        awards: managerDetails.awards || [],
+        notableAchievements: managerDetails.notableAchievements || null,
+        isVerified: managerDetails.isVerified || false,
+        joinedDate: null,
+        fundsManaged: 1,
+        fundsList: [
+          {
+            fundId: fund.fundId,
+            fundName: fund.name,
+            aum: fund.aum,
+            returns: fund.returns,
+          },
+        ],
+        totalAumManaged: fund.aum,
+        averageReturns: fund.returns,
+        email: null,
+        linkedin: null,
+        twitter: null,
+        isActive: true,
+        lastUpdated: managerDetails.lastUpdated || new Date(),
+      };
+
+      return res.json(
+        formatResponse(
+          {
+            fund: {
+              fundId: fund.fundId,
+              name: fund.name,
+              category: fund.category,
+              fundHouse: fund.fundHouse,
+            },
+            manager: formattedManager,
+          },
+          'Fund manager details retrieved successfully'
+        )
+      );
+    }
+
+    // Check if fund has embedded manager object (old structure)
     if (
       fund.fundManager &&
       typeof fund.fundManager === 'object' &&
