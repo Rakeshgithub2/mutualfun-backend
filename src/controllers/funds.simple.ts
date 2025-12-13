@@ -64,6 +64,10 @@ export const getFunds = async (
       skip,
     };
 
+    // Build query filter for counting total
+    const collection = mongodb.getCollection('funds');
+    let countFilter: any = { isActive: true };
+
     // If query parameter is provided, use search method
     if (query) {
       fundsRaw = await fundModel.search(query, {
@@ -72,7 +76,8 @@ export const getFunds = async (
         limit: take,
         skip,
       });
-      total = fundsRaw.length; // Approximate - should be improved with count query
+      // For search, approximate total from results
+      total = fundsRaw.length;
     } else {
       // Use findByCategory for category filtering or findAll
       if (category || subCategory) {
@@ -82,6 +87,7 @@ export const getFunds = async (
             limit: take,
             skip,
           });
+          countFilter.subCategory = subCategory;
         } else if (category === 'equity') {
           // For equity, filter by matching subcategories
           const equitySubcategories = [
@@ -100,7 +106,6 @@ export const getFunds = async (
             'Large & Mid Cap',
           ];
           // Search by subCategory, not category
-          const collection = mongodb.getCollection('funds');
           fundsRaw = await collection
             .find({
               subCategory: { $in: equitySubcategories },
@@ -110,25 +115,31 @@ export const getFunds = async (
             .skip(skip)
             .sort({ popularity: -1, _id: -1 })
             .toArray();
+          countFilter.subCategory = { $in: equitySubcategories };
         } else if (category === 'commodity') {
-          // For commodity, filter by COMMODITY category
-          fundsRaw = await fundModel.findByCategory('COMMODITY', {
+          // For commodity, filter by commodity category (lowercase)
+          fundsRaw = await fundModel.findByCategory('commodity', {
             limit: take,
             skip,
           });
+          countFilter.category = 'commodity';
         } else {
           fundsRaw = await fundModel.findByCategory(category as string, {
             limit: take,
             skip,
           });
+          countFilter.category = category;
         }
       } else {
         fundsRaw = await fundModel.findAll({
           limit: take,
           skip,
         });
+        // countFilter already has isActive: true
       }
-      total = fundsRaw.length; // Approximate - should be improved with count query
+
+      // Get accurate total count
+      total = await collection.countDocuments(countFilter);
     }
 
     // Map _id to id for frontend compatibility
