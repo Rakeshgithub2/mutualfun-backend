@@ -14,6 +14,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else {
+    // Fallback to specific origin
+    res.setHeader('Access-Control-Allow-Origin', 'https://mutual-fun-frontend-osed.vercel.app');
   }
 
   res.setHeader(
@@ -21,7 +25,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     'GET, POST, PUT, DELETE, OPTIONS'
   );
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
