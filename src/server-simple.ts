@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import routes from './routes';
 import { mongodb } from './db/mongodb';
+import { feedbackModel } from './models/Feedback.model';
 
 // Import news cron job
 const newsCron = require('../cron/newsCron');
@@ -61,6 +62,10 @@ async function start() {
     // Connect to MongoDB
     await mongodb.connect();
     console.log('✅ MongoDB connected');
+
+    // Initialize feedback collection indexes
+    await feedbackModel.ensureIndexes();
+    console.log('✅ Feedback indexes initialized');
 
     // Start Express
     const server = app.listen(PORT, () => {

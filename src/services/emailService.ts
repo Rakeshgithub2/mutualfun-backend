@@ -46,6 +46,16 @@ interface PasswordResetEmailData {
   resetUrl: string;
 }
 
+interface FeedbackEmailData {
+  feedbackType: string;
+  rating: number;
+  name: string;
+  email: string | null;
+  message: string;
+  userId: string | null;
+  timestamp: Date;
+}
+
 export class EmailService {
   private resend: Resend | null;
   private fromEmail: string;
@@ -97,6 +107,293 @@ export class EmailService {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+  }
+
+  /**
+   * Send password reset email
+   */
+  async sendPasswordResetEmail(
+    to: string,
+    data: PasswordResetEmailData
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.resend) {
+      console.log('Email service disabled - skipping password reset email');
+      return { success: false, error: 'Email service not configured' };
+    }
+
+    try {
+      const template = this.getPasswordResetTemplate();
+      const compiled = Handlebars.compile(template.html);
+      const html = compiled(data);
+
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to,
+        subject: template.subject,
+        html,
+      });
+
+      console.log(`✓ Password reset email sent to ${to}:`, result.data?.id);
+      return { success: true };
+    } catch (error) {
+      console.error(`Failed to send password reset email to ${to}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Send feedback notification email to admin
+   */
+  async sendFeedbackNotification(
+    data: FeedbackEmailData
+  ): Promise<{ success: boolean; error?: string }> {
+    // Use nodemailer for feedback emails
+    const nodemailer = require('nodemailer');
+
+    // Check if email credentials are configured
+    const emailUser = process.env.EMAIL_USER;
+    const emailPassword = process.env.EMAIL_PASSWORD;
+    const adminEmail = process.env.ADMIN_EMAIL || 'rakesh27082003@gmail.com';
+
+    if (
+      !emailUser ||
+      !emailPassword ||
+      emailPassword === 'your-app-specific-password'
+    ) {
+      console.warn(
+        '⚠️  Email credentials not configured - feedback email will not be sent'
+      );
+      return { success: false, error: 'Email service not configured' };
+    }
+
+    try {
+      // Create transporter
+      const transporter = nodemailer.createTransport({
+        service: process.env.EMAIL_SERVICE || 'gmail',
+        auth: {
+          user: emailUser,
+          pass: emailPassword,
+        },
+      });
+
+      // Generate star rating
+      const stars = '⭐'.repeat(Math.floor(data.rating));
+      const ratingText =
+        data.rating > 0 ? `${data.rating}/5 ${stars}` : 'No rating';
+
+      // Format feedback type
+      const typeEmoji =
+        {
+          bug: '🐛',
+          feature: '✨',
+          general: '💬',
+        }[data.feedbackType] || '💬';
+
+      // Send email
+      await transporter.sendMail({
+        from: emailUser,
+        to: adminEmail,
+        replyTo: data.email || undefined,
+        subject: `New Feedback: [${data.feedbackType.toUpperCase()}] - ${ratingText}`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>New Feedback Received</title>
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                line-height: 1.6; 
+                color: #333;
+                margin: 0;
+                padding: 0;
+                background-color: #f5f5f5;
+              }
+              .container { 
+                max-width: 600px; 
+                margin: 20px auto; 
+                background: white;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+              }
+              .header { 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white; 
+                padding: 30px 20px; 
+                text-align: center;
+              }
+              .header h1 {
+                margin: 0;
+                font-size: 24px;
+                font-weight: 600;
+              }
+              .content { 
+                padding: 30px;
+              }
+              .info-box { 
+                background: #f8f9fa;
+                border-left: 4px solid #667eea;
+                padding: 20px;
+                border-radius: 8px;
+                margin: 20px 0;
+              }
+              .info-row {
+                display: flex;
+                margin: 10px 0;
+                font-size: 14px;
+              }
+              .info-label {
+                font-weight: 600;
+                color: #495057;
+                min-width: 120px;
+              }
+              .info-value {
+                color: #212529;
+              }
+              .message-box {
+                background: #fff;
+                border: 1px solid #e9ecef;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 20px 0;
+              }
+              .message-box h3 {
+                margin-top: 0;
+                color: #495057;
+                font-size: 16px;
+              }
+              .message-text {
+                white-space: pre-wrap;
+                color: #212529;
+                line-height: 1.6;
+                font-size: 14px;
+              }
+              .type-badge {
+                display: inline-block;
+                padding: 4px 12px;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: 600;
+                text-transform: uppercase;
+              }
+              .type-bug {
+                background: #fee;
+                color: #c00;
+              }
+              .type-feature {
+                background: #efe;
+                color: #060;
+              }
+              .type-general {
+                background: #eef;
+                color: #006;
+              }
+              .rating {
+                font-size: 20px;
+                color: #ffc107;
+              }
+              .footer { 
+                background: #f8f9fa;
+                padding: 20px;
+                text-align: center;
+                font-size: 12px;
+                color: #6c757d;
+                border-top: 1px solid #e9ecef;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>${typeEmoji} New User Feedback Received</h1>
+              </div>
+              
+              <div class="content">
+                <div class="info-box">
+                  <div class="info-row">
+                    <span class="info-label">Feedback Type:</span>
+                    <span class="info-value">
+                      <span class="type-badge type-${data.feedbackType}">${typeEmoji} ${data.feedbackType.toUpperCase()}</span>
+                    </span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Rating:</span>
+                    <span class="info-value rating">${ratingText}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Name:</span>
+                    <span class="info-value">${data.name}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Email:</span>
+                    <span class="info-value">${data.email || 'Not provided'}</span>
+                  </div>
+                  ${
+                    data.userId
+                      ? `
+                  <div class="info-row">
+                    <span class="info-label">User ID:</span>
+                    <span class="info-value">${data.userId}</span>
+                  </div>
+                  `
+                      : ''
+                  }
+                  <div class="info-row">
+                    <span class="info-label">Submitted:</span>
+                    <span class="info-value">${new Date(
+                      data.timestamp
+                    ).toLocaleString('en-US', {
+                      dateStyle: 'full',
+                      timeStyle: 'long',
+                    })}</span>
+                  </div>
+                </div>
+                
+                <div class="message-box">
+                  <h3>📝 Message:</h3>
+                  <div class="message-text">${this.escapeHtml(data.message)}</div>
+                </div>
+              </div>
+              
+              <div class="footer">
+                <p>This is an automated notification from your Mutual Funds Platform</p>
+                <p>&copy; ${new Date().getFullYear()} Mutual Funds Portal. All rights reserved.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+      });
+
+      console.log(`✓ Feedback notification email sent to ${adminEmail}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to send feedback notification email:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Escape HTML to prevent XSS
+   */
+  private escapeHtml(text: string): string {
+    const map: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;',
+    };
+    return text.replace(/[&<>"']/g, (m) => map[m]);
   }
 
   /**

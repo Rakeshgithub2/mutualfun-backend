@@ -15,21 +15,16 @@ const transporter = nodemailer.createTransport({
 // POST /api/feedback - Submit user feedback
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { feedback, userName, userEmail, timestamp } = req.body;
+    const { feedback, timestamp } = req.body;
 
     if (!feedback || !feedback.trim()) {
       return res.status(400).json({ error: 'Feedback is required' });
     }
 
-    const name = userName || 'Anonymous User';
-    const email = userEmail || 'No email provided';
-
     // Log feedback to console
     console.log('\n' + '='.repeat(80));
     console.log('📬 NEW USER FEEDBACK RECEIVED');
     console.log('='.repeat(80));
-    console.log(`Name: ${name}`);
-    console.log(`Email: ${email}`);
     console.log(`Date: ${new Date(timestamp).toLocaleString()}`);
     console.log(`\nFeedback:\n${feedback}`);
     console.log('='.repeat(80) + '\n');
@@ -60,9 +55,8 @@ router.post('/', async (req: Request, res: Response) => {
 
       await transporter.sendMail({
         from: process.env.EMAIL_USER || 'noreply@mutualfunds.com',
-        to: 'rakeshd01042024@gmail.com',
-        subject: `📬 New Feedback from ${name}`,
-        replyTo: email !== 'No email provided' ? email : undefined,
+        to: process.env.ADMIN_EMAIL || 'rakeshd01042024@gmail.com',
+        subject: '📬 New User Feedback',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 2px solid #4F46E5; border-radius: 10px;">
             <h2 style="color: #4F46E5; border-bottom: 2px solid #4F46E5; padding-bottom: 10px;">
@@ -70,8 +64,6 @@ router.post('/', async (req: Request, res: Response) => {
             </h2>
             
             <div style="margin: 20px 0; padding: 15px; background-color: #F3F4F6; border-radius: 8px;">
-              <p style="margin: 5px 0;"><strong>👤 Name:</strong> ${name}</p>
-              <p style="margin: 5px 0;"><strong>📧 Email:</strong> ${email}</p>
               <p style="margin: 5px 0;"><strong>📅 Date:</strong> ${new Date(timestamp).toLocaleString()}</p>
             </div>
             

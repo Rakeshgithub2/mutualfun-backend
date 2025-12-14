@@ -16,7 +16,7 @@ import comparisonRoutes from './comparison';
 import taxRoutes from './tax';
 import aiRoutes from './ai';
 import suggestRoutes from './suggest';
-import feedbackRoutes from './feedback.routes';
+import feedbackRoutes from './feedback';
 
 const router = Router();
 

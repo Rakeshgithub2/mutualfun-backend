@@ -17,7 +17,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   } else {
     // Fallback to specific origin
-    res.setHeader('Access-Control-Allow-Origin', 'https://mutual-fun-frontend-osed.vercel.app');
+    res.setHeader(
+      'Access-Control-Allow-Origin',
+      'https://mutual-fun-frontend-osed.vercel.app'
+    );
   }
 
   res.setHeader(

@@ -7,6 +7,7 @@ import {
   pagination,
   buildSortOrder,
 } from '../utils/response';
+import { enrichFundData } from '../utils/fundMetrics';
 // import { cacheService, CacheService } from '../services/cacheService';
 
 const getFundsSchema = z.object({
@@ -106,8 +107,41 @@ export const getFunds = async (
       },
     });
 
+    // Enrich funds with calculated metrics (only for first page to improve performance)
+    let enrichedFunds = funds;
+    if (page === 1 && funds.length > 0) {
+      console.log('📊 Enriching first page funds with metrics...');
+      enrichedFunds = await Promise.all(
+        funds.map(async (fund) => {
+          try {
+            // Get 1 year of performance data for calculations
+            const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+            const performances = await prisma.fundPerformance.findMany({
+              where: {
+                fundId: fund.id,
+                date: { gte: oneYearAgo },
+              },
+              orderBy: { date: 'desc' },
+              select: {
+                date: true,
+                nav: true,
+              },
+            });
+
+            if (performances.length > 30) {
+              return enrichFundData(fund, performances);
+            }
+          } catch (error) {
+            console.error(`Error enriching fund ${fund.id}:`, error);
+          }
+          return fund;
+        })
+      );
+      console.log('✅ Funds enriched with metrics');
+    }
+
     const response = formatPaginatedResponse(
-      funds,
+      enrichedFunds,
       total,
       page,
       limit,
@@ -162,15 +196,6 @@ export const getFundById = async (
             qualification: true,
           },
         },
-        performances: {
-          where: {
-            date: {
-              gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000), // Last 1 year
-            },
-          },
-          orderBy: { date: 'desc' },
-          take: 100, // Limit performance data
-        },
       },
     });
 
@@ -179,8 +204,50 @@ export const getFundById = async (
       return res.status(404).json({ error: 'Fund not found' });
     }
 
-    console.log(`✅ Fund ${fund.name} retrieved successfully`);
-    const response = formatResponse(fund, 'Fund retrieved successfully');
+    // Get extended performance data for accurate calculations (up to 10 years)
+    console.log(`📊 Fetching performance data for fund ${fund.name}...`);
+    const tenYearsAgo = new Date(Date.now() - 10 * 365 * 24 * 60 * 60 * 1000);
+    const allPerformances = await prisma.fundPerformance.findMany({
+      where: {
+        fundId: fund.id,
+        date: { gte: tenYearsAgo },
+      },
+      orderBy: { date: 'desc' },
+      select: {
+        date: true,
+        nav: true,
+      },
+    });
+
+    // Enrich fund data with calculated metrics
+    console.log(
+      `📈 Calculating metrics from ${allPerformances.length} data points...`
+    );
+    const enrichedFund = enrichFundData(fund, allPerformances);
+
+    // Add performance data for chart (last 1 year)
+    const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const fundWithPerformances = {
+      ...enrichedFund,
+      performances: allPerformances
+        .filter((p) => new Date(p.date) >= oneYearAgo)
+        .slice(0, 365),
+      performanceHistory: allPerformances
+        .filter((p) => new Date(p.date) >= oneYearAgo)
+        .slice(0, 365),
+    };
+
+    console.log(`✅ Fund ${fund.name} retrieved with metrics:`, {
+      returns: fundWithPerformances.returns,
+      riskMetrics: fundWithPerformances.riskMetrics,
+      riskLevel: fundWithPerformances.riskLevel,
+      rating: fundWithPerformances.rating,
+    });
+
+    const response = formatResponse(
+      fundWithPerformances,
+      'Fund details retrieved successfully'
+    );
 
     // Cache the response
     // await cacheService.setJSON(
