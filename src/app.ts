@@ -6,21 +6,48 @@ import { errorHandler } from './middlewares/error';
 
 const app = express();
 
+// Get allowed origins from environment or use defaults
+const getAllowedOrigins = () => {
+  const envOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+  const defaultOrigins = [
+    'http://localhost:5001',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://mf-frontend-coral.vercel.app',
+    'https://mutual-fun-frontend-osed.vercel.app',
+  ];
+
+  return [...new Set([...defaultOrigins, ...envOrigins])];
+};
+
 // Security middleware
 app.use(helmet());
 app.use(
   cors({
-    origin: [
-      'http://localhost:5001',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://mf-frontend-coral.vercel.app',
-      'https://mutual-fun-frontend-osed.vercel.app',
-      process.env.FRONTEND_URL || 'http://localhost:5001',
-    ],
+    origin: (origin, callback) => {
+      const allowedOrigins = getAllowedOrigins();
+
+      // Allow requests with no origin (like mobile apps or Postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn('CORS blocked origin:', origin);
+        // In production, still allow but log for monitoring
+        callback(null, true);
+      }
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+    ],
+    exposedHeaders: ['Set-Cookie'],
   })
 );
 

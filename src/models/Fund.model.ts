@@ -8,23 +8,52 @@ import { z } from 'zod';
  */
 export const FundSchema = z.object({
   fundId: z.string().min(1, 'Fund ID is required'),
+  amfiCode: z.string().optional(),
   name: z.string().min(1, 'Fund name is required'),
-  category: z.enum(['equity', 'debt', 'hybrid', 'commodity', 'etf', 'index']),
+  category: z.enum([
+    'equity',
+    'debt',
+    'hybrid',
+    'commodity',
+    'etf',
+    'index',
+    'elss',
+    'solution_oriented',
+    'international',
+  ]),
   subCategory: z.string(),
   fundType: z.enum(['mutual_fund', 'etf']),
 
+  // SEBI Mandatory Fields
+  schemeType: z.enum(['direct', 'regular']),
+  planType: z.enum(['growth', 'idcw', 'dividend']),
+  riskOMeter: z
+    .enum([
+      'low',
+      'low_to_moderate',
+      'moderate',
+      'moderately_high',
+      'high',
+      'very_high',
+    ])
+    .optional(),
+
   // Basic Info
   fundHouse: z.string().min(1, 'Fund house is required'),
-  launchDate: z.date(),
-  aum: z.number().min(0),
-  expenseRatio: z.number().min(0).max(5),
-  exitLoad: z.number().min(0).max(100),
-  minInvestment: z.number().min(0),
-  sipMinAmount: z.number().min(0),
+  benchmark: z.string().optional(),
+  launchDate: z.date().optional(),
+  aum: z.number().min(0).optional(),
+  aumDate: z.date().optional(),
+  expenseRatio: z.number().min(0).max(5).optional(),
+  exitLoad: z.number().min(0).max(100).optional(),
+  minInvestment: z.number().min(0).optional(),
+  sipMinAmount: z.number().min(0).optional(),
 
   // Manager Info
   fundManagerId: z.string().optional(),
-  fundManager: z.string(),
+  fundManager: z.string().optional(),
+  fundManagerExperience: z.number().optional(),
+  fundManagerTenure: z.number().optional(),
 
   // Performance
   returns: z.object({
@@ -293,13 +322,29 @@ export class FundModel {
   }
 
   /**
-   * Get funds by category
+   * Get funds by category (Zero-NA Policy Enforced)
    */
   async findByCategory(
     category: string,
-    options: { limit?: number; skip?: number; sortBy?: string } = {}
+    options: {
+      limit?: number;
+      skip?: number;
+      sortBy?: string;
+      enforceVisibility?: boolean; // Zero-NA policy
+    } = {}
   ): Promise<Fund[]> {
-    const query: Filter<Fund> = { category: category as any, isActive: true };
+    const query: Filter<Fund> = {
+      category: category as any,
+      isActive: true,
+    };
+
+    // Enforce zero-NA policy (only show complete data)
+    if (options.enforceVisibility !== false) {
+      query.isPubliclyVisible = true;
+      // @ts-ignore
+      query['dataCompleteness.completenessScore'] = { $gte: 60 };
+    }
+
     const sort: any = {};
 
     if (options.sortBy === 'returns') {
@@ -319,18 +364,31 @@ export class FundModel {
   }
 
   /**
-   * Get funds by category with specific subcategories filter
+   * Get funds by category with specific subcategories filter (Zero-NA Policy)
    */
   async findByCategoryWithSubcategories(
     category: string,
     subcategories: string[],
-    options: { limit?: number; skip?: number; sortBy?: string } = {}
+    options: {
+      limit?: number;
+      skip?: number;
+      sortBy?: string;
+      enforceVisibility?: boolean;
+    } = {}
   ): Promise<Fund[]> {
     const query: Filter<Fund> = {
       category: category as any,
       subCategory: { $in: subcategories } as any,
       isActive: true,
     };
+
+    // Enforce zero-NA policy
+    if (options.enforceVisibility !== false) {
+      query.isPubliclyVisible = true;
+      // @ts-ignore
+      query['dataCompleteness.completenessScore'] = { $gte: 60 };
+    }
+
     const sort: any = {};
 
     if (options.sortBy === 'returns') {
@@ -352,16 +410,29 @@ export class FundModel {
   }
 
   /**
-   * Get funds by subcategory
+   * Get funds by subcategory (Zero-NA Policy)
    */
   async findBySubCategory(
     subCategory: string,
-    options: { limit?: number; skip?: number; sortBy?: string } = {}
+    options: {
+      limit?: number;
+      skip?: number;
+      sortBy?: string;
+      enforceVisibility?: boolean;
+    } = {}
   ): Promise<Fund[]> {
     const query: Filter<Fund> = {
       subCategory: subCategory as any,
       isActive: true,
     };
+
+    // Enforce zero-NA policy
+    if (options.enforceVisibility !== false) {
+      query.isPubliclyVisible = true;
+      // @ts-ignore
+      query['dataCompleteness.completenessScore'] = { $gte: 60 };
+    }
+
     const sort: any = {};
 
     if (options.sortBy === 'returns') {

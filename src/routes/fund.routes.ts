@@ -29,7 +29,7 @@ const router = Router();
  * - sortBy: aum|returns.oneYear|returns.threeYear|name
  * - sortOrder: asc|desc
  * - page: Page number (default: 1)
- * - limit: Items per page (default: 20, max: 100)
+ * - limit: Items per page (default: 20, max: 2500)
  */
 router.get('/', optionalAuth, async (req: Request, res: Response) => {
   try {
@@ -45,7 +45,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
     } = req.query;
 
     const pageNum = Math.max(1, parseInt(page as string));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string)));
+    const limitNum = Math.min(2500, Math.max(1, parseInt(limit as string)));
     const skip = (pageNum - 1) * limitNum;
 
     // Build query
@@ -314,7 +314,7 @@ router.get('/top/:category', async (req: Request, res: Response) => {
     const { category } = req.params;
     const { sortBy = 'returns.oneYear', limit = '10' } = req.query;
 
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit as string)));
+    const limitNum = Math.min(500, Math.max(1, parseInt(limit as string)));
 
     const db = mongodb.getDb();
 

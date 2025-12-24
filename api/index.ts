@@ -12,22 +12,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   ];
 
   const origin = req.headers.origin;
+
+  // Set appropriate CORS headers
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else if (origin) {
+    // Allow any origin but log it for debugging
+    console.log('Unknown origin:', origin);
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
   } else {
-    // Fallback to specific origin
-    res.setHeader(
-      'Access-Control-Allow-Origin',
-      'https://mutual-fun-frontend-osed.vercel.app'
-    );
+    // Fallback for no origin (like direct API calls)
+    res.setHeader('Access-Control-Allow-Origin', '*');
   }
 
   res.setHeader(
     'Access-Control-Allow-Methods',
-    'GET, POST, PUT, DELETE, OPTIONS'
+    'GET, POST, PUT, DELETE, OPTIONS, PATCH'
   );
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-Requested-With, Content-Type, Authorization, Accept, Origin'
+  );
 
   // Handle preflight
   if (req.method === 'OPTIONS') {

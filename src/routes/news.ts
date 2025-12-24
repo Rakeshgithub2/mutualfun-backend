@@ -1,100 +1,39 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
+import {
+  getLatestNews,
+  getNewsByCategory,
+  searchNews,
+  refreshNews,
+} from '../controllers/news.controller';
 
 const router = Router();
-const newsService = require('../../services/newsService');
 
 /**
  * @route   GET /api/news
- * @desc    Get top 8 financial news with language support
+ * @desc    Get latest verified news
  * @access  Public
  */
-router.get('/', async (req: Request, res: Response) => {
-  try {
-    const { language = 'english' } = req.query;
-
-    const news = await newsService.getNews(language);
-
-    res.json({
-      success: true,
-      data: {
-        articles: news.articles,
-        lastUpdated: news.lastUpdated,
-        totalCount: news.articles.length,
-      },
-    });
-  } catch (error) {
-    console.error('Error fetching news:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch news',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
+router.get('/', getLatestNews);
 
 /**
- * @route   GET /api/news/:id
- * @desc    Get full article details by ID
+ * @route   GET /api/news/category/:category
+ * @desc    Get news by category
  * @access  Public
  */
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
+router.get('/category/:category', getNewsByCategory);
 
-    const article = await newsService.getArticleById(id);
-
-    if (!article) {
-      return res.status(404).json({
-        success: false,
-        message: 'Article not found',
-      });
-    }
-
-    // Get related news
-    const relatedNews = await newsService.getRelatedNews(
-      article.category,
-      id,
-      5
-    );
-
-    res.json({
-      success: true,
-      data: {
-        article,
-        relatedNews,
-      },
-    });
-  } catch (error) {
-    console.error('Error fetching article:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch article',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
+/**
+ * @route   GET /api/news/search
+ * @desc    Search news
+ * @access  Public
+ */
+router.get('/search', searchNews);
 
 /**
  * @route   POST /api/news/refresh
- * @desc    Manually trigger news refresh (testing mode - 8 articles)
- * @access  Public
+ * @desc    Refresh news from all sources (admin)
+ * @access  Admin
  */
-router.post('/refresh', async (req: Request, res: Response) => {
-  try {
-    await newsService.fetchAndStoreNews(false); // isScheduled = false, fetches 8 articles for testing
-
-    res.json({
-      success: true,
-      message: 'News refreshed successfully (testing mode - 8 articles)',
-    });
-  } catch (error) {
-    console.error('Error refreshing news:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to refresh news',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
+router.post('/refresh', refreshNews);
 
 export default router;

@@ -183,7 +183,7 @@ router.get('/suggest', throttle, async (req: Request, res: Response) => {
  * - minAum: Minimum AUM filter
  * - fuzzy: Enable fuzzy matching (default: true)
  * - boost: Enable boosting by AUM/popularity (default: true)
- * - limit: Max results (default: 20, max: 100)
+ * - limit: Max results (default: 20, max: 2500)
  *
  * Features:
  * - Multi-layered search (exact → prefix → fuzzy → tag-based)
@@ -223,7 +223,7 @@ router.get('/funds', throttle, async (req: Request, res: Response) => {
       });
     }
 
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string)));
+    const limitNum = Math.min(2500, Math.max(1, parseInt(limit as string)));
     const enableFuzzy = fuzzy === 'true';
     const enableBoost = boost === 'true';
     const minAumNum = minAum ? parseFloat(minAum as string) : undefined;
@@ -329,7 +329,7 @@ router.get('/by-tags', throttle, async (req: Request, res: Response) => {
       .split(',')
       .map((t) => t.trim())
       .filter((t) => t);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string)));
+    const limitNum = Math.min(2500, Math.max(1, parseInt(limit as string)));
 
     const db = mongodb.getDb();
     const results = await db

@@ -5,9 +5,12 @@ import dotenv from 'dotenv';
 import routes from './routes';
 import { mongodb } from './db/mongodb';
 import { feedbackModel } from './models/Feedback.model';
+import { rankingService } from './services/ranking.service';
+import { dataGovernanceService } from './services/dataGovernance.service';
 
-// Import news cron job
+// Import cron jobs
 const newsCron = require('../cron/newsCron');
+const rankingCron = require('../cron/rankingCron');
 
 dotenv.config();
 
@@ -67,6 +70,12 @@ async function start() {
     await feedbackModel.ensureIndexes();
     console.log('✅ Feedback indexes initialized');
 
+    // Initialize ranking service
+    const db = mongodb.getDb();
+    await rankingService.initialize(db);
+    await dataGovernanceService.initialize(db);
+    console.log('✅ Ranking and data governance services initialized');
+
     // Start Express
     const server = app.listen(PORT, () => {
       console.log('\n' + '='.repeat(60));
@@ -82,6 +91,10 @@ async function start() {
       console.log('  GET    /api/funds');
       console.log('  GET    /api/news');
       console.log('  POST   /api/news/refresh');
+      console.log('  GET    /api/rankings/top');
+      console.log('  GET    /api/rankings/category/:category');
+      console.log('  GET    /api/rankings/risk-adjusted');
+      console.log('  GET    /api/market-indices');
       console.log('  GET    /api/portfolio/:userId');
       console.log('  GET    /api/portfolio/:userId/summary');
       console.log('  GET    /api/portfolio/:userId/transactions');
@@ -92,6 +105,7 @@ async function start() {
       // Initialize news cron job after server starts
       console.log('⏰ Initializing scheduled tasks...');
       newsCron.scheduleNewsFetch();
+      rankingCron.initializeRankingCronJobs();
       console.log('✅ All scheduled tasks initialized\n');
     });
 

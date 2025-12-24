@@ -1,4 +1,8 @@
 import { MongoClient, Db, Collection, Document } from 'mongodb';
+import { config } from 'dotenv';
+
+// Load environment variables
+config();
 
 const DATABASE_URL =
   process.env.DATABASE_URL || 'mongodb://localhost:27017/mutual_funds_db';

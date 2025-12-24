@@ -9,16 +9,24 @@ import {
   getCurrentUser,
   updateProfile,
   deleteAccount,
+  forgotPassword,
+  verifyOTP,
+  resetPassword,
 } from '../controllers/auth.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
 
 const router = Router();
 
 // Public routes - Authentication
-router.post('/register', register); // Email/Password registration
+router.post('/register', register); // Email/Password registration with firstName/lastName
 router.post('/login', login); // Email/Password login
 router.post('/google', googleSignIn); // Google OAuth
 router.post('/refresh', refreshToken); // Refresh access token
+
+// Password reset routes (public)
+router.post('/forgot-password', forgotPassword); // Request password reset OTP
+router.post('/verify-otp', verifyOTP); // Verify OTP code
+router.post('/reset-password', resetPassword); // Reset password with OTP
 
 // Protected routes - User management
 router.post('/logout', authenticateToken, logout);

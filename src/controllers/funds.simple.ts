@@ -15,8 +15,9 @@ const getFundsSchema = z.object({
   type: z.string().optional(),
   category: z.string().optional(),
   subCategory: z.string().optional(), // Add subCategory support
+  top: z.enum(['20', '50', '100']).optional(), // Add top funds filter
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(2500).default(20),
   sort: z.string().optional(),
 });
 
@@ -38,17 +39,59 @@ export const getFunds = async (
 ): Promise<Response> => {
   try {
     console.log('📥 GET /funds request received');
-    const { query, type, category, subCategory, page, limit, sort } =
+    const { query, type, category, subCategory, top, page, limit, sort } =
       getFundsSchema.parse(req.query);
     console.log('✅ Request params validated:', {
       query,
       type,
       category,
       subCategory,
+      top,
       page,
       limit,
       sort,
     });
+
+    // Handle Top N funds filtering
+    if (top) {
+      const topLimit = parseInt(top);
+      const collection = mongodb.getCollection('funds');
+
+      const topFunds = await collection
+        .find({ isActive: true })
+        .sort({
+          'returns.oneYear': -1, // Sort by 1-year returns
+          aum: -1, // Then by AUM
+          popularity: -1,
+        })
+        .limit(topLimit)
+        .toArray();
+
+      const formattedFunds = topFunds.map((fund) => ({
+        id: fund._id || fund.fundId,
+        fundId: fund.fundId,
+        name: fund.name,
+        category: fund.category,
+        subCategory: fund.subCategory,
+        fundType: fund.fundType,
+        fundHouse: fund.fundHouse,
+        currentNav: fund.currentNav || 0,
+        returns: fund.returns || {},
+        aum: fund.aum || 0,
+        expenseRatio: fund.expenseRatio || 0,
+        riskLevel: fund.riskLevel || 'MEDIUM',
+      }));
+
+      return res.json(
+        formatPaginatedResponse(
+          formattedFunds,
+          1, // page
+          topLimit, // limit
+          topFunds.length, // total
+          `Top ${top} funds retrieved successfully`
+        )
+      );
+    }
 
     const { skip, take } = pagination(page, limit);
 
@@ -439,10 +482,10 @@ export const getFundNavs = async (
 };
 
 /**
- * GET /suggest?q=sb
- * Fuzzy search for autocomplete
+ * GET /suggest?q=nip
+ * Fuzzy search for autocomplete - searches ALL funds
  * Used in: Fund Compare, Fund Overlap, Search bar
- * Supports 1-2 word queries
+ * Example: typing "nip" returns Nippon funds, typing "sb" returns SBI funds
  */
 export const getSuggestions = async (
   req: Request,
@@ -451,10 +494,10 @@ export const getSuggestions = async (
   try {
     const { q } = req.query;
 
-    if (!q || typeof q !== 'string' || q.trim().length < 2) {
+    if (!q || typeof q !== 'string' || q.trim().length < 1) {
       return res.status(400).json({
         error:
-          'Query parameter "q" is required and must be at least 2 characters',
+          'Query parameter "q" is required and must be at least 1 character',
       });
     }
 
@@ -462,12 +505,22 @@ export const getSuggestions = async (
     console.log('📥 GET /suggest request received for query:', query);
 
     const fundModel = FundModel.getInstance();
+    const collection = mongodb.getCollection('funds');
 
-    // Use the search method with a limit of 10 for suggestions
-    const searchResults = await fundModel.search(query, {
-      limit: 10,
-      skip: 0,
-    });
+    // Search across ALL funds with comprehensive matching
+    const searchResults = await collection
+      .find({
+        $or: [
+          { name: { $regex: `^${query}`, $options: 'i' } }, // Starts with (priority)
+          { name: { $regex: query, $options: 'i' } }, // Contains anywhere
+          { fundHouse: { $regex: `^${query}`, $options: 'i' } }, // Fund house starts with
+          { category: { $regex: query, $options: 'i' } }, // Category match
+        ],
+        isActive: true,
+      })
+      .limit(15) // Increased limit for better suggestions
+      .sort({ popularity: -1, aum: -1 })
+      .toArray();
 
     // Format suggestions for autocomplete
     const suggestions = searchResults.map((fund: any) => ({
@@ -475,13 +528,15 @@ export const getSuggestions = async (
       fundId: fund.fundId,
       name: fund.name,
       category: fund.category,
+      subCategory: fund.subCategory,
       fundType: fund.fundType,
       fundHouse: fund.fundHouse,
-      currentNav: fund.currentNav,
+      currentNav: fund.currentNav || 0,
       returns: {
-        oneYear: fund.returns?.oneYear,
-        threeYear: fund.returns?.threeYear,
+        oneYear: fund.returns?.oneYear || 0,
+        threeYear: fund.returns?.threeYear || 0,
       },
+      aum: fund.aum || 0,
     }));
 
     console.log('✅ Suggestions retrieved:', suggestions.length);

@@ -83,7 +83,9 @@ export class AuthService {
     password: string,
     name: string,
     ip: string,
-    userAgent: string
+    userAgent: string,
+    firstName?: string,
+    lastName?: string
   ): Promise<User> {
     const usersCollection = this.db.collection<User>('users');
 
@@ -101,10 +103,15 @@ export class AuthService {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-    // Split name into first and last name
-    const nameParts = name.trim().split(' ');
-    const firstName = nameParts[0] || name;
-    const lastName = nameParts.slice(1).join(' ') || '';
+    // Use provided firstName/lastName or split name
+    let userFirstName = firstName;
+    let userLastName = lastName;
+
+    if (!firstName || !lastName) {
+      const nameParts = name.trim().split(' ');
+      userFirstName = nameParts[0] || name;
+      userLastName = nameParts.slice(1).join(' ') || '';
+    }
 
     // Create new user
     const newUser: User = {
@@ -114,8 +121,8 @@ export class AuthService {
       emailVerified: false, // Email verification required
       authMethod: 'email',
       name,
-      firstName,
-      lastName,
+      firstName: userFirstName,
+      lastName: userLastName,
       preferences: {
         theme: 'light',
         language: 'en',
@@ -531,5 +538,189 @@ export class AuthService {
         },
       }
     );
+  }
+
+  /**
+   * Generate 6-digit OTP
+   */
+  private generateOTP(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  /**
+   * Request password reset - Generate and send OTP
+   */
+  async requestPasswordReset(
+    email: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const usersCollection = this.db.collection<User>('users');
+    const otpCollection = this.db.collection('password_reset_otps');
+
+    // Check if user exists
+    const user = await usersCollection.findOne({ email });
+    if (!user) {
+      // Don't reveal if user exists or not for security
+      return {
+        success: true,
+        message: 'If your email is registered, you will receive an OTP',
+      };
+    }
+
+    // Generate OTP
+    const otp = this.generateOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Delete any existing OTPs for this email
+    await otpCollection.deleteMany({ email });
+
+    // Store OTP
+    await otpCollection.insertOne({
+      email,
+      otp,
+      expiresAt,
+      verified: false,
+      attempts: 0,
+      createdAt: new Date(),
+    });
+
+    // Send OTP email
+    const emailService = require('./emailService').emailService;
+    try {
+      await emailService.sendPasswordResetOTP(email, {
+        name: user.firstName || user.name,
+        otp,
+      });
+    } catch (error) {
+      console.error('Failed to send OTP email:', error);
+      return { success: false, message: 'Failed to send OTP email' };
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Verify password reset OTP
+   */
+  async verifyPasswordResetOTP(
+    email: string,
+    otp: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const otpCollection = this.db.collection('password_reset_otps');
+
+    const otpRecord = await otpCollection.findOne({ email, otp });
+
+    if (!otpRecord) {
+      // Increment attempt counter if OTP exists for this email
+      await otpCollection.updateOne({ email }, { $inc: { attempts: 1 } });
+      return { success: false, message: 'Invalid OTP' };
+    }
+
+    // Check if expired
+    if (new Date() > otpRecord.expiresAt) {
+      return {
+        success: false,
+        message: 'OTP has expired. Please request a new one',
+      };
+    }
+
+    // Check if already verified
+    if (otpRecord.verified) {
+      return { success: false, message: 'OTP has already been used' };
+    }
+
+    // Check attempts
+    if (otpRecord.attempts >= 5) {
+      return {
+        success: false,
+        message: 'Too many failed attempts. Please request a new OTP',
+      };
+    }
+
+    // Mark as verified
+    await otpCollection.updateOne({ email, otp }, { $set: { verified: true } });
+
+    return { success: true };
+  }
+
+  /**
+   * Reset password with verified OTP
+   */
+  async resetPasswordWithOTP(
+    email: string,
+    otp: string,
+    newPassword: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const usersCollection = this.db.collection<User>('users');
+    const otpCollection = this.db.collection('password_reset_otps');
+
+    // Find OTP record
+    const otpRecord = await otpCollection.findOne({ email, otp });
+
+    if (!otpRecord) {
+      return { success: false, message: 'Invalid OTP' };
+    }
+
+    // Check if verified
+    if (!otpRecord.verified) {
+      return {
+        success: false,
+        message: 'OTP not verified. Please verify OTP first',
+      };
+    }
+
+    // Check if expired
+    if (new Date() > otpRecord.expiresAt) {
+      return {
+        success: false,
+        message: 'OTP has expired. Please request a new one',
+      };
+    }
+
+    // Validate new password
+    if (newPassword.length < 6) {
+      return {
+        success: false,
+        message: 'Password must be at least 6 characters long',
+      };
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+    // Update user password
+    const result = await usersCollection.updateOne(
+      { email },
+      {
+        $set: {
+          password: hashedPassword,
+          updatedAt: new Date(),
+        },
+        $unset: {
+          refreshTokens: '', // Invalidate all refresh tokens
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return { success: false, message: 'User not found' };
+    }
+
+    // Delete used OTP
+    await otpCollection.deleteOne({ email, otp });
+
+    // Send confirmation email
+    const user = await usersCollection.findOne({ email });
+    if (user) {
+      const emailService = require('./emailService').emailService;
+      try {
+        await emailService.sendPasswordChangedEmail(email, {
+          name: user.firstName || user.name,
+        });
+      } catch (error) {
+        console.error('Failed to send password changed email:', error);
+      }
+    }
+
+    return { success: true };
   }
 }

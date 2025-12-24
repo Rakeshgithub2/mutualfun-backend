@@ -3,12 +3,22 @@
  */
 
 export interface RawFundData {
-  symbol: string;
-  name: string;
-  category: string;
+  // AMFI fields
+  schemeCode?: string;
+  isinDiv?: string;
+  isinGrowth?: string;
+  schemeName?: string;
+  nav?: string;
+  date?: string;
+  fundHouse?: string;
+  schemeType?: string;
+
+  // Generic fields
+  symbol?: string;
+  name?: string;
+  category?: string;
   subCategory?: string;
-  fundHouse: string;
-  nav: number;
+  currentNav?: number;
   previousNav?: number;
   aum?: number;
   expenseRatio?: number;
@@ -27,8 +37,8 @@ export interface RawFundData {
     fiveYear?: number;
   };
   fundManager?: string;
-  fundType: 'mutual_fund' | 'etf';
-  dataSource: string;
+  fundType?: 'mutual_fund' | 'etf';
+  dataSource?: string;
 }
 
 export interface RawManagerData {

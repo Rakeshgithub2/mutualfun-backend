@@ -16,7 +16,7 @@ const getFundsSchema = z.object({
   subCategory: z.string().optional(),
   q: z.string().optional(), // search query
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(10),
+  limit: z.coerce.number().min(1).max(2500).default(10),
   sort: z.string().optional(), // field:direction (e.g., name:asc, createdAt:desc)
 });
 

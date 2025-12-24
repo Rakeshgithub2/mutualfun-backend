@@ -822,6 +822,226 @@ export class EmailService {
       `,
     };
   }
+
+  /**
+   * Send password reset OTP email
+   */
+  async sendPasswordResetOTP(
+    to: string,
+    data: { name: string; otp: string }
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.resend) {
+      console.log('Email service disabled - skipping OTP email');
+      return { success: false, error: 'Email service not configured' };
+    }
+
+    try {
+      const template = this.getPasswordResetOTPTemplate();
+      const compiled = Handlebars.compile(template.html);
+      const html = compiled(data);
+
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to,
+        subject: template.subject,
+        html,
+      });
+
+      console.log('Password reset OTP email sent:', result);
+      return { success: true };
+    } catch (error: any) {
+      console.error('Failed to send password reset OTP:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send password changed confirmation email
+   */
+  async sendPasswordChangedEmail(
+    to: string,
+    data: { name: string }
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.resend) {
+      console.log('Email service disabled - skipping password changed email');
+      return { success: false, error: 'Email service not configured' };
+    }
+
+    try {
+      const template = this.getPasswordChangedTemplate();
+      const compiled = Handlebars.compile(template.html);
+      const html = compiled(data);
+
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to,
+        subject: template.subject,
+        html,
+      });
+
+      console.log('Password changed email sent:', result);
+      return { success: true };
+    } catch (error: any) {
+      console.error('Failed to send password changed email:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Password reset OTP template
+   */
+  private getPasswordResetOTPTemplate(): EmailTemplate {
+    return {
+      subject: '🔐 Your Password Reset Code',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Password Reset OTP</title>
+          <style>
+            body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 30px; text-align: center; }
+            .content { padding: 40px 30px; }
+            .otp-box { background-color: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 30px; text-align: center; margin: 30px 0; }
+            .otp-code { font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #667eea; font-family: 'Courier New', monospace; }
+            .warning { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
+            .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+            .footer { background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e0e0e0; color: #999999; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
+            <tr>
+              <td align="center" style="padding: 20px;">
+                <table cellpadding="0" cellspacing="0" border="0" class="container" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                  <tr>
+                    <td class="header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 30px; text-align: center;">
+                      <h1 style="margin: 0;">🔐 Password Reset</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="content" style="padding: 40px 30px;">
+                      <h2 style="color: #333333; margin-top: 0;">Hello {{name}}!</h2>
+                      <p style="color: #666666; font-size: 16px; line-height: 1.6;">
+                        We received a request to reset your password. Use the OTP code below to reset your password:
+                      </p>
+                      
+                      <div class="otp-box" style="background-color: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 30px; text-align: center; margin: 30px 0;">
+                        <p style="color: #666666; margin: 0 0 15px 0; font-size: 14px;">Your OTP Code:</p>
+                        <div class="otp-code" style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #667eea; font-family: 'Courier New', monospace;">
+                          {{otp}}
+                        </div>
+                        <p style="color: #999999; margin: 15px 0 0 0; font-size: 12px;">This code will expire in 10 minutes</p>
+                      </div>
+
+                      <div class="warning" style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
+                        <p style="margin: 0; color: #856404; font-size: 14px;">
+                          ⚠️ <strong>Security Notice:</strong> If you didn't request this password reset, please ignore this email and ensure your account is secure.
+                        </p>
+                      </div>
+
+                      <p style="color: #666666; font-size: 14px; line-height: 1.6;">
+                        Enter this code on the password reset page to create a new password for your account.
+                      </p>
+
+                      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin-top: 30px;">
+                        Best regards,<br>
+                        <strong>The Mutual Funds Platform Team</strong>
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="footer" style="background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e0e0e0;">
+                      <p style="color: #999999; font-size: 12px; margin: 0;">
+                        © ${new Date().getFullYear()} Mutual Funds Platform. All rights reserved.
+                      </p>
+                      <p style="color: #999999; font-size: 12px; margin: 10px 0 0 0;">
+                        This is an automated email. Please do not reply.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+    };
+  }
+
+  /**
+   * Password changed confirmation template
+   */
+  private getPasswordChangedTemplate(): EmailTemplate {
+    return {
+      subject: '✅ Your Password Has Been Changed',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Password Changed</title>
+          <style>
+            body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: #ffffff; padding: 30px; text-align: center; }
+            .content { padding: 40px 30px; }
+            .success-box { background-color: #d4edda; border: 2px solid #c3e6cb; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0; color: #155724; }
+            .footer { background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e0e0e0; color: #999999; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
+            <tr>
+              <td align="center" style="padding: 20px;">
+                <table cellpadding="0" cellspacing="0" border="0" class="container" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                  <tr>
+                    <td class="header" style="background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: #ffffff; padding: 30px; text-align: center;">
+                      <h1 style="margin: 0;">✅ Password Changed</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="content" style="padding: 40px 30px;">
+                      <h2 style="color: #333333; margin-top: 0;">Hello {{name}}!</h2>
+                      
+                      <div class="success-box" style="background-color: #d4edda; border: 2px solid #c3e6cb; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0; color: #155724;">
+                        <h3 style="margin: 0 0 10px 0;">Your password has been successfully changed</h3>
+                        <p style="margin: 0; font-size: 14px;">You can now login with your new password</p>
+                      </div>
+
+                      <p style="color: #666666; font-size: 16px; line-height: 1.6;">
+                        Your account password was recently updated. If you made this change, you can safely ignore this email.
+                      </p>
+
+                      <p style="color: #666666; font-size: 16px; line-height: 1.6;">
+                        <strong>If you did NOT make this change:</strong> Please contact our support team immediately, as your account may have been compromised.
+                      </p>
+
+                      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin-top: 30px;">
+                        Stay secure,<br>
+                        <strong>The Mutual Funds Platform Team</strong>
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="footer" style="background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e0e0e0;">
+                      <p style="color: #999999; font-size: 12px; margin: 0;">
+                        © ${new Date().getFullYear()} Mutual Funds Platform. All rights reserved.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+    };
+  }
 }
 
 export const emailService = new EmailService();

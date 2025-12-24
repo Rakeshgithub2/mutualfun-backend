@@ -22,13 +22,21 @@ export async function register(
   next: NextFunction
 ) {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, firstName, lastName } = req.body;
 
     // Validation
-    if (!email || !password || !name) {
+    if (!email || !password) {
       return res.status(400).json({
         success: false,
-        error: 'Email, password, and name are required',
+        error: 'Email and password are required',
+      });
+    }
+
+    // Require either name OR firstName+lastName
+    if (!name && (!firstName || !lastName)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Name (or firstName and lastName) are required',
       });
     }
 
@@ -41,6 +49,14 @@ export async function register(
       });
     }
 
+    // Validate password strength (min 6 characters)
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 6 characters long',
+      });
+    }
+
     // Get client info
     const ip =
       (req.headers['x-forwarded-for'] as string) ||
@@ -48,18 +64,31 @@ export async function register(
       'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
 
+    // Prepare user data
+    const userData = {
+      email: email.toLowerCase().trim(),
+      password,
+      name: name ? name.trim() : `${firstName} ${lastName}`,
+      firstName: firstName ? firstName.trim() : name?.split(' ')[0],
+      lastName: lastName
+        ? lastName.trim()
+        : name?.split(' ').slice(1).join(' '),
+    };
+
     // Register user
     const user = await getAuthService().registerWithEmail(
-      email.toLowerCase().trim(),
-      password,
-      name.trim(),
+      userData.email,
+      userData.password,
+      userData.name,
       ip,
-      userAgent
+      userAgent,
+      userData.firstName,
+      userData.lastName
     );
 
     // Send welcome email
     await emailService.sendWelcomeEmail(user.email, {
-      name: user.name,
+      name: user.firstName || user.name,
       authMethod: 'email',
     });
 
@@ -219,11 +248,17 @@ export async function googleSignIn(
     const userAgent = req.headers['user-agent'] || 'unknown';
 
     // Check if this is a new user
-    const existingUser = await getAuthService().getUserByEmail(googleData.email);
+    const existingUser = await getAuthService().getUserByEmail(
+      googleData.email
+    );
     const isNewUser = !existingUser;
 
     // Find or create user
-    const user = await getAuthService().findOrCreateUser(googleData, ip, userAgent);
+    const user = await getAuthService().findOrCreateUser(
+      googleData,
+      ip,
+      userAgent
+    );
 
     // Send welcome email for new users
     if (isNewUser) {
@@ -499,7 +534,10 @@ export async function updateProfile(
       }
     }
 
-    const updatedUser = await getAuthService().updateUserProfile(userId, updates);
+    const updatedUser = await getAuthService().updateUserProfile(
+      userId,
+      updates
+    );
 
     res.json({
       success: true,
@@ -544,6 +582,165 @@ export async function deleteAccount(
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete account',
+    });
+  }
+}
+
+/**
+ * Request password reset OTP
+ * POST /api/auth/forgot-password
+ */
+export async function forgotPassword(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email is required',
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid email format',
+      });
+    }
+
+    // Generate and send OTP
+    const result = await getAuthService().requestPasswordReset(
+      email.toLowerCase().trim()
+    );
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.message || 'Failed to send OTP',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset OTP has been sent to your email',
+      data: {
+        email: email.toLowerCase().trim(),
+        expiresIn: 600, // 10 minutes in seconds
+      },
+    });
+  } catch (error: any) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to process password reset request',
+    });
+  }
+}
+
+/**
+ * Verify OTP code
+ * POST /api/auth/verify-otp
+ */
+export async function verifyOTP(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email and OTP are required',
+      });
+    }
+
+    const result = await getAuthService().verifyPasswordResetOTP(
+      email.toLowerCase().trim(),
+      otp.trim()
+    );
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.message || 'Invalid or expired OTP',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'OTP verified successfully',
+      data: {
+        email: email.toLowerCase().trim(),
+        verified: true,
+      },
+    });
+  } catch (error: any) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to verify OTP',
+    });
+  }
+}
+
+/**
+ * Reset password with verified OTP
+ * POST /api/auth/reset-password
+ */
+export async function resetPassword(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email, OTP, and new password are required',
+      });
+    }
+
+    // Validate password strength
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 6 characters long',
+      });
+    }
+
+    const result = await getAuthService().resetPasswordWithOTP(
+      email.toLowerCase().trim(),
+      otp.trim(),
+      newPassword
+    );
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.message || 'Failed to reset password',
+      });
+    }
+
+    res.json({
+      success: true,
+      message:
+        'Password reset successfully. You can now login with your new password.',
+    });
+  } catch (error: any) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to reset password',
     });
   }
 }

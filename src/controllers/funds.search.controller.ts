@@ -12,6 +12,8 @@ const searchFundsSchema = z.object({
 /**
  * GET /funds/search
  * Search funds by name with autocomplete suggestions
+ * Searches across ALL funds in the database - starts matching from beginning
+ * Example: if user types "nip", returns all funds starting with "nip" (Nippon, etc.)
  */
 export const searchFunds = async (
   req: Request,
@@ -24,13 +26,16 @@ export const searchFunds = async (
     const fundModel = FundModel.getInstance();
     const collection = fundModel['collection']; // Access private collection
 
-    // Perform text search or regex search for fund names
+    // Perform comprehensive text search for fund names
+    // Using ^query for starts-with matching + case-insensitive for better UX
     const funds = await collection
       .find({
         $or: [
-          { name: { $regex: query, $options: 'i' } },
-          { fundHouse: { $regex: query, $options: 'i' } },
-          { searchTerms: { $regex: query, $options: 'i' } },
+          { name: { $regex: `^${query}`, $options: 'i' } }, // Starts with (highest priority)
+          { name: { $regex: query, $options: 'i' } }, // Contains
+          { fundHouse: { $regex: query, $options: 'i' } }, // Fund house match
+          { category: { $regex: query, $options: 'i' } }, // Category match
+          { subCategory: { $regex: query, $options: 'i' } }, // SubCategory match
         ],
         isActive: true,
       })
