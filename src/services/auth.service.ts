@@ -310,6 +310,7 @@ export class AuthService {
       userId: randomUUID(),
       googleId: googleData.sub,
       email: googleData.email,
+      password: undefined, // No password for Google users
       emailVerified: googleData.email_verified,
       authMethod: 'google',
       name: googleData.name,

@@ -125,7 +125,6 @@ export async function register(
         },
         tokens: {
           accessToken,
-          refreshToken,
           expiresIn: 900,
         },
       },
@@ -204,7 +203,6 @@ export async function login(req: Request, res: Response, next: NextFunction) {
         },
         tokens: {
           accessToken,
-          refreshToken,
           expiresIn: 900,
         },
       },
@@ -305,7 +303,6 @@ export async function googleSignIn(
         },
         tokens: {
           accessToken,
-          refreshToken, // Also send in response for flexibility
           expiresIn: 900, // 15 minutes (in seconds)
         },
       },
@@ -743,4 +740,26 @@ export async function resetPassword(
       error: error.message || 'Failed to reset password',
     });
   }
+}
+
+/**
+ * Helper function to sanitize user data for API responses
+ * Removes sensitive fields like passwords and refresh tokens
+ */
+function sanitizeUserData(user: any) {
+  return {
+    userId: user.userId,
+    email: user.email,
+    name: user.name,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    picture: user.picture,
+    emailVerified: user.emailVerified,
+    authMethod: user.authMethod,
+    preferences: user.preferences,
+    subscription: user.subscription,
+    kyc: user.kyc,
+    lastLogin: user.lastLogin,
+    createdAt: user.createdAt,
+  };
 }
