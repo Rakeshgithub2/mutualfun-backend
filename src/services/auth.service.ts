@@ -95,9 +95,9 @@ export class AuthService {
       throw new Error('User with this email already exists');
     }
 
-    // Validate password strength
+    // Validate password length only
     if (password.length < 8) {
-      throw new Error('Password must be at least 8 characters long');
+      throw new Error('Password must be at least 8 characters');
     }
 
     // Hash password

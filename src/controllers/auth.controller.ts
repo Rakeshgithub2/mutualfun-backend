@@ -49,11 +49,11 @@ export async function register(
       });
     }
 
-    // Validate password strength (min 6 characters)
-    if (password.length < 6) {
+    // Validate password length (min 8 characters)
+    if (password.length < 8) {
       return res.status(400).json({
         success: false,
-        error: 'Password must be at least 6 characters long',
+        error: 'Password must be at least 8 characters',
       });
     }
 
@@ -707,11 +707,11 @@ export async function resetPassword(
       });
     }
 
-    // Validate password strength
-    if (newPassword.length < 6) {
+    // Validate password length
+    if (newPassword.length < 8) {
       return res.status(400).json({
         success: false,
-        error: 'Password must be at least 6 characters long',
+        error: 'Password must be at least 8 characters',
       });
     }
 
