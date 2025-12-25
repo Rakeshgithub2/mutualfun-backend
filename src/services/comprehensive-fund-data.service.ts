@@ -579,12 +579,16 @@ export class ComprehensiveFundDataService {
           {
             fundId: fund.fundId,
             fundName: fund.name,
+            category: fund.category,
+            subCategory: fund.subCategory,
             startDate: new Date(),
             aum: fund.aum,
+            tenure: 0,
             returns: {
               oneYear: fund.returns.oneYear,
               threeYear: fund.returns.threeYear,
               fiveYear: fund.returns.fiveYear,
+              sinceTenure: fund.returns.oneYear,
             },
           },
         ],
@@ -606,17 +610,15 @@ export class ComprehensiveFundDataService {
         .updateOne({ name: manager.name }, { $set: manager }, { upsert: true });
 
       // Update fund with manager ID
-      await this.db
-        .collection<Fund>('funds')
-        .updateOne(
-          { fundId },
-          {
-            $set: {
-              fundManager: manager.name,
-              fundManagerId: manager.managerId,
-            },
-          }
-        );
+      await this.db.collection<Fund>('funds').updateOne(
+        { fundId },
+        {
+          $set: {
+            fundManager: manager.name,
+            fundManagerId: manager.managerId,
+          },
+        }
+      );
     }
   }
 

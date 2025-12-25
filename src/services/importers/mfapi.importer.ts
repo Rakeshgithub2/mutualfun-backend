@@ -371,7 +371,7 @@ export class MFAPIImporter {
         category: categoryInfo.category as any,
         subCategory: categoryInfo.subCategory,
         fundHouse,
-        nav: parseFloat(latestNav.nav),
+        nav: latestNav.nav,
         previousNav: details.data[1]
           ? parseFloat(details.data[1].nav)
           : parseFloat(latestNav.nav),

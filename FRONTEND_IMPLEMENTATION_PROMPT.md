@@ -1294,68 +1294,136 @@ export default function FundComparison() {
 
 ---
 
-## 9️⃣ GOOGLE ANALYTICS (Optional but Recommended)
+## 9️⃣ GOOGLE ANALYTICS (✅ CONFIGURED)
 
-### Add to `app/layout.tsx` or `_app.tsx`
+**Measurement ID**: `G-6V6F9P27P8` | **Stream ID**: `13188643413`
+
+> 📚 **Complete Guide**: See `GOOGLE_ANALYTICS_SETUP.md` for full implementation
+>
+> 📦 **Ready-to-use Files**: All files available in `frontend-code/` directory
+>
+> ⚡ **Quick Start**: See `GOOGLE_ANALYTICS_QUICK_START.md`
+
+### Environment Variables
+
+Add to your `.env` or `.env.local`:
+
+```env
+# For Next.js
+NEXT_PUBLIC_GA_MEASUREMENT_ID=G-6V6F9P27P8
+
+# For Vite
+VITE_GA_MEASUREMENT_ID=G-6V6F9P27P8
+
+# For Create React App
+REACT_APP_GA_MEASUREMENT_ID=G-6V6F9P27P8
+```
+
+### Quick Setup for Next.js
+
+1. **Copy implementation files**:
+
+   ```bash
+   # Copy from frontend-code/ directory
+   cp frontend-code/src/lib/analytics.ts your-project/lib/
+   cp frontend-code/src/components/GoogleAnalytics.tsx your-project/components/
+   cp frontend-code/src/components/AnalyticsPageTracker.tsx your-project/components/
+   ```
+
+2. **Update `app/layout.tsx`**:
 
 ```typescript
-import Script from 'next/script';
+import GoogleAnalytics from '@/components/GoogleAnalytics';
+import AnalyticsPageTracker from '@/components/AnalyticsPageTracker';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-
   return (
     <html lang="en">
-      <head>
-        {/* Google Analytics */}
-        {GA_MEASUREMENT_ID && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-              strategy="afterInteractive"
-            />
-            <Script id="google-analytics" strategy="afterInteractive">
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${GA_MEASUREMENT_ID}', {
-                  page_path: window.location.pathname,
-                });
-              `}
-            </Script>
-          </>
-        )}
-      </head>
-      <body>{children}</body>
+      <body>
+        <GoogleAnalytics />
+        <AnalyticsPageTracker />
+        {children}
+      </body>
     </html>
   );
 }
 ```
 
-### Track Events
+### Quick Setup for React (Vite)
+
+1. **Copy files**:
+
+   ```bash
+   cp frontend-code/src/lib/analytics.ts your-project/src/lib/
+   cp frontend-code/index.html your-project/
+   ```
+
+2. **Update `App.tsx`**:
 
 ```typescript
-export const trackEvent = (
-  action: string,
-  category: string,
-  label?: string,
-  value?: number
-) => {
-  if (typeof window !== 'undefined' && (window as any).gtag) {
-    (window as any).gtag('event', action, {
-      event_category: category,
-      event_label: label,
-      value: value,
-    });
-  }
-};
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { pageview } from './lib/analytics';
 
-// Usage
-trackEvent('search', 'Search', query);
-trackEvent('view_fund', 'Funds', fundId);
-trackEvent('compare_funds', 'Comparison', selectedFunds.join(','));
+function App() {
+  const location = useLocation();
+
+  useEffect(() => {
+    pageview(location.pathname + location.search);
+  }, [location]);
+
+  return <div>{/* Your app */}</div>;
+}
 ```
+
+### Available Tracking Functions
+
+The `analytics.ts` utility provides these pre-configured functions:
+
+```typescript
+import {
+  pageview, // Track page views
+  event, // Track custom events
+  trackSearch, // Track search queries
+  trackFundView, // Track fund detail views
+  trackFundComparison, // Track fund comparisons
+  trackWatchlistAction, // Track watchlist add/remove
+  trackAuth, // Track login/signup/logout
+  trackFilter, // Track filter applications
+  trackSort, // Track sorting
+  trackExport, // Track exports
+  trackError, // Track errors
+} from '@/lib/analytics';
+```
+
+### Usage Examples
+
+```typescript
+// Track search
+trackSearch('HDFC Equity', resultsCount);
+
+// Track fund view
+trackFundView(fund.fundId, fund.name);
+
+// Track comparison
+trackFundComparison(['FUND123', 'FUND456']);
+
+// Track watchlist
+trackWatchlistAction('add', fundId);
+
+// Track authentication
+trackAuth('login', 'google');
+
+// Track errors
+trackError(error.message, 'ComponentName');
+```
+
+### Complete Documentation
+
+- **`GOOGLE_ANALYTICS_SETUP.md`** - Full setup guide
+- **`GOOGLE_ANALYTICS_QUICK_START.md`** - Quick reference
+- **`frontend-code/ANALYTICS_USAGE_EXAMPLES.md`** - Component examples
+- **`frontend-code/README.md`** - Implementation guide
 
 ---
 

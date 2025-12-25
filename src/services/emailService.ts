@@ -396,41 +396,6 @@ export class EmailService {
     return text.replace(/[&<>"']/g, (m) => map[m]);
   }
 
-  /**
-   * Send password reset email
-   */
-  async sendPasswordResetEmail(
-    to: string,
-    data: PasswordResetEmailData
-  ): Promise<{ success: boolean; error?: string }> {
-    if (!this.resend) {
-      console.log('Email service disabled - skipping password reset email');
-      return { success: false, error: 'Email service not configured' };
-    }
-
-    try {
-      const template = this.getPasswordResetTemplate();
-      const compiled = Handlebars.compile(template.html);
-      const html = compiled(data);
-
-      const result = await this.resend.emails.send({
-        from: this.fromEmail,
-        to,
-        subject: template.subject,
-        html,
-      });
-
-      console.log(`✓ Password reset email sent to ${to}:`, result.data?.id);
-      return { success: true };
-    } catch (error) {
-      console.error(`Failed to send password reset email to ${to}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  }
-
   async sendVerificationEmail(
     to: string,
     data: VerificationEmailData

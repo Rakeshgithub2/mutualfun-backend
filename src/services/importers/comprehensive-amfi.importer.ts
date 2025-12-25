@@ -249,6 +249,9 @@ export class ComprehensiveAMFIImporter {
 
     const result: ImportResult = {
       success: false,
+      imported: 0,
+      failed: 0,
+      data: [],
       fundsAdded: 0,
       fundsUpdated: 0,
       fundsSkipped: 0,

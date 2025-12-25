@@ -70,6 +70,9 @@ export interface ImportResult {
   failed: number;
   errors: string[];
   data: any[];
+  fundsAdded?: number;
+  fundsUpdated?: number;
+  fundsSkipped?: number;
 }
 
 export interface ImportOptions {
@@ -77,4 +80,7 @@ export interface ImportOptions {
   skipExisting?: boolean;
   updateExisting?: boolean;
   dryRun?: boolean;
+  onlyFromAMCs?: string[];
+  skipValidation?: boolean;
+  enforceSEBICategories?: boolean;
 }
