@@ -21,12 +21,14 @@
 ### CHANGE #1: Fix API Base URL (Remove `/api` suffix)
 
 **Location:** Find your API client configuration file. It's usually in one of these locations:
+
 - `src/api/axios.ts` or `src/api/axios.js`
 - `src/lib/axios.ts` or `src/lib/api.ts`
 - `src/config/api.ts` or `src/config/constants.ts`
 - `src/utils/api.ts` or `src/services/apiClient.ts`
 
 **Find this code:**
+
 ```typescript
 // ❌ WRONG - Has /api in base URL
 const API_BASE_URL = 'https://mutualfun-backend.vercel.app/api';
@@ -37,6 +39,7 @@ const baseURL = 'https://mutualfun-backend.vercel.app/api';
 ```
 
 **Change to:**
+
 ```typescript
 // ✅ CORRECT - Remove /api from base URL
 const API_BASE_URL = 'https://mutualfun-backend.vercel.app';
@@ -47,11 +50,13 @@ const baseURL = 'https://mutualfun-backend.vercel.app';
 ```
 
 **Why?** The backend routes are already mounted at `/api`, so:
+
 - Your API calls use: `/api/auth/register`
 - Base URL should be: `https://mutualfun-backend.vercel.app`
 - Final URL: `https://mutualfun-backend.vercel.app/api/auth/register` ✅
 
 If base URL has `/api`, you get:
+
 - `https://mutualfun-backend.vercel.app/api` + `/api/auth/register`
 - = `https://mutualfun-backend.vercel.app/api/api/auth/register` ❌ (404!)
 
@@ -85,6 +90,7 @@ export default api;
 ```
 
 **Usage in components stays the same:**
+
 ```typescript
 // These paths include /api - that's correct!
 api.post('/api/auth/register', { email, password, name });
@@ -99,12 +105,14 @@ api.post('/api/auth/google', { idToken });
 **File: `.env` or `.env.production` or `.env.local`**
 
 **Change from:**
+
 ```env
 ❌ VITE_API_URL=https://mutualfun-backend.vercel.app/api
 ❌ REACT_APP_API_URL=https://mutualfun-backend.vercel.app/api
 ```
 
 **Change to:**
+
 ```env
 ✅ VITE_API_URL=https://mutualfun-backend.vercel.app
 ✅ REACT_APP_API_URL=https://mutualfun-backend.vercel.app
@@ -128,11 +136,11 @@ REACT_APP_GOOGLE_CLIENT_ID=336417139932-cofv6fogqqch4uub4k19krimj1mhoslc.apps.go
 3. Click **Settings** → **Environment Variables**
 4. Find or add these variables:
 
-| Variable Name | Value | Environment |
-|--------------|-------|-------------|
-| `VITE_API_URL` | `https://mutualfun-backend.vercel.app` | Production |
-| `REACT_APP_API_URL` | `https://mutualfun-backend.vercel.app` | Production |
-| `VITE_GOOGLE_CLIENT_ID` | `336417139932-cofv6fogqqch4uub4k19krimj1mhoslc.apps.googleusercontent.com` | Production |
+| Variable Name           | Value                                                                      | Environment |
+| ----------------------- | -------------------------------------------------------------------------- | ----------- |
+| `VITE_API_URL`          | `https://mutualfun-backend.vercel.app`                                     | Production  |
+| `REACT_APP_API_URL`     | `https://mutualfun-backend.vercel.app`                                     | Production  |
+| `VITE_GOOGLE_CLIENT_ID` | `336417139932-cofv6fogqqch4uub4k19krimj1mhoslc.apps.googleusercontent.com` | Production  |
 
 5. Click **Save**
 6. Go to **Deployments** tab
@@ -149,14 +157,17 @@ Go to: https://console.cloud.google.com/apis/credentials
 2. Click **Edit**
 
 3. Under **Authorized JavaScript origins**, add:
+
    ```
    http://localhost:3000
    http://localhost:5001
    https://mutual-fun-frontend-osed.vercel.app
    ```
+
    **Important:** No trailing slashes!
 
 4. Under **Authorized redirect URIs**, add:
+
    ```
    http://localhost:3002/api/auth/google/callback
    http://localhost:3000/auth/callback
@@ -201,6 +212,7 @@ vercel --prod
 5. Look at the request URL:
 
 **Should see:**
+
 ```
 ✅ CORRECT: https://mutualfun-backend.vercel.app/api/auth/register
 ❌ WRONG: https://mutualfun-backend.vercel.app/api/api/auth/register
@@ -213,6 +225,7 @@ If you see `/api/api`, the base URL still has `/api` - fix it!
 In Network tab → Select any API request → **Headers** tab:
 
 **Should see:**
+
 ```
 Response Headers:
 ✅ Access-Control-Allow-Origin: https://mutual-fun-frontend-osed.vercel.app
@@ -237,18 +250,19 @@ Response Headers:
 
 ## 📊 QUICK REFERENCE
 
-| What | Wrong ❌ | Correct ✅ |
-|------|---------|-----------|
-| Base URL | `https://mutualfun-backend.vercel.app/api` | `https://mutualfun-backend.vercel.app` |
-| Register URL | `.../api/api/auth/register` | `.../api/auth/register` |
-| Login URL | `.../api/api/auth/login` | `.../api/auth/login` |
-| Status | 404 Not Found | 200 OK |
+| What         | Wrong ❌                                   | Correct ✅                             |
+| ------------ | ------------------------------------------ | -------------------------------------- |
+| Base URL     | `https://mutualfun-backend.vercel.app/api` | `https://mutualfun-backend.vercel.app` |
+| Register URL | `.../api/api/auth/register`                | `.../api/auth/register`                |
+| Login URL    | `.../api/api/auth/login`                   | `.../api/auth/login`                   |
+| Status       | 404 Not Found                              | 200 OK                                 |
 
 ---
 
 ## ✅ CHECKLIST
 
 **In Code:**
+
 - [ ] Found API client file (axios.ts or similar)
 - [ ] Removed `/api` from base URL constant
 - [ ] Verified API calls still have `/api` in the path
@@ -256,18 +270,21 @@ Response Headers:
 - [ ] Committed changes
 
 **In Vercel Dashboard:**
+
 - [ ] Updated `VITE_API_URL` (no `/api`)
 - [ ] Updated `REACT_APP_API_URL` (no `/api`)
 - [ ] Added Google Client ID
 - [ ] Clicked "Redeploy"
 
 **In Google Console:**
+
 - [ ] Added `https://mutual-fun-frontend-osed.vercel.app` to JavaScript origins
 - [ ] Added redirect URIs
 - [ ] Saved changes
 - [ ] Waited 5-10 minutes
 
 **Testing:**
+
 - [ ] Checked Network tab - no `/api/api`
 - [ ] Registration works (200 OK)
 - [ ] Login works (200 OK)
@@ -291,22 +308,26 @@ After all changes:
 ## 🆘 TROUBLESHOOTING
 
 **Still getting 404?**
+
 - Check if base URL still has `/api` somewhere
 - Check environment variables (both local and Vercel)
 - Clear browser cache and hard refresh (Ctrl+F5)
 
 **Still getting CORS error?**
+
 - Wait 5 minutes - backend might be cold starting
 - Check Network tab headers
 - Make sure `withCredentials: true` is set in axios
 
 **Google OAuth still blocked?**
+
 - Wait 10 minutes after saving in Google Console
 - Clear browser cache
 - Try incognito mode
 - Verify exact domain spelling in Google Console
 
 **Environment variables not working?**
+
 - Make sure variable names match your framework:
   - Vite uses `VITE_`
   - Create React App uses `REACT_APP_`
@@ -320,6 +341,7 @@ After all changes:
 **Main Issue:** Your frontend API base URL includes `/api`, but your API calls also include `/api`, resulting in `/api/api` (404 error).
 
 **Solution:** Remove `/api` from the base URL everywhere:
+
 1. Code: Change base URL to `https://mutualfun-backend.vercel.app`
 2. .env: Remove `/api` suffix
 3. Vercel: Update environment variables

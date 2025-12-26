@@ -62,11 +62,15 @@ export const config = {
 
   // CORS
   cors: {
-    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || [
-      'http://localhost:3000',
+    allowedOrigins: [
       'http://localhost:5001',
-      'http://localhost:5173',
-    ],
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'https://mf-frontend-coral.vercel.app',
+      'https://mutual-fun-frontend-osed.vercel.app',
+      process.env.FRONTEND_URL,
+      ...(process.env.ALLOWED_ORIGINS?.split(',') || []),
+    ].filter(Boolean),
   },
 
   // External APIs

@@ -8,15 +8,16 @@ const app = express();
 
 // Get allowed origins from environment or use defaults
 const getAllowedOrigins = () => {
-  const envOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
   const defaultOrigins = [
     'http://localhost:5001',
     'http://localhost:3000',
     'http://localhost:3001',
     'https://mf-frontend-coral.vercel.app',
     'https://mutual-fun-frontend-osed.vercel.app',
-  ];
+    process.env.FRONTEND_URL,
+  ].filter(Boolean);
 
+  const envOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
   return [...new Set([...defaultOrigins, ...envOrigins])];
 };
 
