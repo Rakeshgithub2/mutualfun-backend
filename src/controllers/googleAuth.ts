@@ -113,7 +113,10 @@ export const handleGoogleCallback = async (
     console.log('✅ ID token verified, payload:', {
       email: payload?.email,
       name: payload?.name,
+      given_name: payload?.given_name,
+      family_name: payload?.family_name,
       picture: payload?.picture,
+      sub: payload?.sub,
     });
 
     if (!payload || !payload.email) {
@@ -130,6 +133,8 @@ export const handleGoogleCallback = async (
       googleId: payload.sub, // Google user ID
       email: payload.email,
       name: payload.name || payload.email.split('@')[0],
+      firstName: payload.given_name || '', // ✅ Store first name separately
+      lastName: payload.family_name || '', // ✅ Store last name separately
       profilePicture: payload.picture || undefined,
       provider: 'google',
       isVerified: true, // Google emails are verified
@@ -138,7 +143,7 @@ export const handleGoogleCallback = async (
 
     // For new users, also set these fields
     const setOnInsert: Partial<User> = {
-      password: await hashPassword(crypto.randomBytes(20).toString('hex')), // Random password for OAuth users
+      password: '', // Empty password for Google-only users (they don't have password auth)
       role: 'USER',
       kycStatus: 'PENDING',
       createdAt: new Date(),

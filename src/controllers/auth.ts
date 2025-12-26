@@ -41,6 +41,14 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
 
     if (existingUser) {
+      // Check if user registered with Google
+      if (existingUser.provider === 'google') {
+        res.status(409).json({
+          error:
+            'This email is registered using Google. Please login with Google.',
+        });
+        return;
+      }
       res.status(409).json({
         error: 'User already exists with this email',
       });
@@ -58,6 +66,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       age: validatedData.age || undefined,
       riskLevel: validatedData.riskLevel || undefined,
       role: 'USER',
+      provider: 'local', // Set provider for email/password registration
       isVerified: false,
       kycStatus: 'PENDING',
       createdAt: new Date(),
@@ -157,6 +166,22 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     if (!user) {
       res.status(401).json({ error: 'Invalid credentials' });
+      return;
+    }
+
+    // Check if user is Google-only
+    if (user.provider === 'google') {
+      res.status(401).json({
+        error: 'This account uses Google Sign-In. Please login with Google.',
+      });
+      return;
+    }
+
+    // Check if user has password set
+    if (!user.password) {
+      res.status(401).json({
+        error: 'Password not set for this account. Please use Google Sign-In.',
+      });
       return;
     }
 

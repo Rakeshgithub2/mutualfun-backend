@@ -147,8 +147,7 @@ npm install @react-oauth/google
 // App.jsx or main.jsx
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
-const GOOGLE_CLIENT_ID =
-  'your-google-client-id.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = 'your-google-client-id.apps.googleusercontent.com';
 
 function App() {
   return (

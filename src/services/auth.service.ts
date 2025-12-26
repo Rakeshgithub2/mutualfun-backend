@@ -92,6 +92,12 @@ export class AuthService {
     // Check if user already exists
     const existingUser = await usersCollection.findOne({ email });
     if (existingUser) {
+      // Check if user registered with Google
+      if (existingUser.authMethod === 'google') {
+        throw new Error(
+          'This email is registered using Google. Please login with Google.'
+        );
+      }
       throw new Error('User with this email already exists');
     }
 
@@ -183,10 +189,17 @@ export class AuthService {
       throw new Error('Invalid email or password');
     }
 
-    // Check if user has password (not Google-only user)
+    // Check if user is Google-only (never set a password)
+    if (user.authMethod === 'google') {
+      throw new Error(
+        'This account uses Google Sign-In. Please login with Google.'
+      );
+    }
+
+    // Check if user has password (safety check)
     if (!user.password) {
       throw new Error(
-        'This account was created with Google. Please sign in with Google.'
+        'Password not set for this account. Please use Google Sign-In or reset your password.'
       );
     }
 
