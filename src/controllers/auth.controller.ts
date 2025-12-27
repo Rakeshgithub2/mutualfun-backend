@@ -5,7 +5,10 @@ import { emailService } from '../services/emailService';
 
 // Lazy initialization to avoid calling getDb() before connection
 let authService: AuthService;
-function getAuthService() {
+async function getAuthService() {
+  // Ensure MongoDB connection for serverless
+  await mongodb.connect();
+  
   if (!authService) {
     authService = new AuthService(mongodb.getDb());
   }
@@ -76,7 +79,8 @@ export async function register(
     };
 
     // Register user
-    const user = await getAuthService().registerWithEmail(
+    const authSvc = await getAuthService();
+    const user = await authSvc.registerWithEmail(
       userData.email,
       userData.password,
       userData.name,
@@ -93,11 +97,11 @@ export async function register(
     });
 
     // Generate tokens
-    const accessToken = getAuthService().generateAccessToken(user);
-    const refreshToken = getAuthService().generateRefreshToken(user);
+    const accessToken = authSvc.generateAccessToken(user);
+    const refreshToken = authSvc.generateRefreshToken(user);
 
     // Save refresh token
-    await getAuthService().saveRefreshToken(user.userId, refreshToken);
+    await authSvc.saveRefreshToken(user.userId, refreshToken);
 
     // Set refresh token in HTTP-only cookie
     res.cookie('refreshToken', refreshToken, {
@@ -162,7 +166,8 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     const userAgent = req.headers['user-agent'] || 'unknown';
 
     // Login user
-    const user = await getAuthService().loginWithEmail(
+    const authSvc = await getAuthService();
+    const user = await authSvc.loginWithEmail(
       email.toLowerCase().trim(),
       password,
       ip,
@@ -170,11 +175,11 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     );
 
     // Generate tokens
-    const accessToken = getAuthService().generateAccessToken(user);
-    const refreshToken = getAuthService().generateRefreshToken(user);
+    const accessToken = authSvc.generateAccessToken(user);
+    const refreshToken = authSvc.generateRefreshToken(user);
 
     // Save refresh token
-    await getAuthService().saveRefreshToken(user.userId, refreshToken);
+    await authSvc.saveRefreshToken(user.userId, refreshToken);
 
     // Set refresh token in HTTP-only cookie
     res.cookie('refreshToken', refreshToken, {
@@ -236,7 +241,8 @@ export async function googleSignIn(
     }
 
     // Verify Google token
-    const googleData = await getAuthService().verifyGoogleToken(idToken);
+    const authSvc = await getAuthService();
+    const googleData = await authSvc.verifyGoogleToken(idToken);
 
     // Get client info
     const ip =
@@ -246,13 +252,13 @@ export async function googleSignIn(
     const userAgent = req.headers['user-agent'] || 'unknown';
 
     // Check if this is a new user
-    const existingUser = await getAuthService().getUserByEmail(
+    const existingUser = await authSvc.getUserByEmail(
       googleData.email
     );
     const isNewUser = !existingUser;
 
     // Find or create user
-    const user = await getAuthService().findOrCreateUser(
+    const user = await authSvc.findOrCreateUser(
       googleData,
       ip,
       userAgent
@@ -267,11 +273,11 @@ export async function googleSignIn(
     }
 
     // Generate tokens
-    const accessToken = getAuthService().generateAccessToken(user);
-    const refreshToken = getAuthService().generateRefreshToken(user);
+    const accessToken = authSvc.generateAccessToken(user);
+    const refreshToken = authSvc.generateRefreshToken(user);
 
     // Save refresh token
-    await getAuthService().saveRefreshToken(user.userId, refreshToken);
+    await authSvc.saveRefreshToken(user.userId, refreshToken);
 
     // Set refresh token in HTTP-only cookie for security
     res.cookie('refreshToken', refreshToken, {
@@ -337,10 +343,11 @@ export async function refreshToken(
     }
 
     // Verify refresh token
-    const decoded = getAuthService().verifyRefreshToken(refreshToken);
+    const authSvc = await getAuthService();
+    const decoded = authSvc.verifyRefreshToken(refreshToken);
 
     // Validate against database
-    const isValid = await getAuthService().validateRefreshToken(
+    const isValid = await authSvc.validateRefreshToken(
       decoded.userId,
       refreshToken
     );
@@ -352,7 +359,7 @@ export async function refreshToken(
     }
 
     // Get user
-    const user = await getAuthService().getUserById(decoded.userId);
+    const user = await authSvc.getUserById(decoded.userId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -361,7 +368,7 @@ export async function refreshToken(
     }
 
     // Generate new access token
-    const newAccessToken = getAuthService().generateAccessToken(user);
+    const newAccessToken = authSvc.generateAccessToken(user);
 
     res.json({
       success: true,
@@ -397,7 +404,8 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
 
     // Revoke refresh token
     if (refreshToken) {
-      await getAuthService().revokeRefreshToken(userId, refreshToken);
+      const authSvc = await getAuthService();
+      await authSvc.revokeRefreshToken(userId, refreshToken);
     }
 
     // Clear refresh token cookie
@@ -436,7 +444,8 @@ export async function logoutAll(
     }
 
     // Revoke all refresh tokens
-    await getAuthService().revokeAllRefreshTokens(userId);
+    const authSvc = await getAuthService();
+    await authSvc.revokeAllRefreshTokens(userId);
 
     res.json({
       success: true,
@@ -531,7 +540,8 @@ export async function updateProfile(
       }
     }
 
-    const updatedUser = await getAuthService().updateUserProfile(
+    const authSvc = await getAuthService();
+    const updatedUser = await authSvc.updateUserProfile(
       userId,
       updates
     );
