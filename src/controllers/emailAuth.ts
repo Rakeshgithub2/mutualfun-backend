@@ -55,8 +55,8 @@ export const emailRegister = async (req: Request, res: Response) => {
     const usersCollection = db.collection<User>('users');
 
     // Check if user already exists
-    const existingUser = await usersCollection.findOne({ 
-      email: email.toLowerCase().trim() 
+    const existingUser = await usersCollection.findOne({
+      email: email.toLowerCase().trim(),
     });
 
     if (existingUser) {
@@ -78,7 +78,9 @@ export const emailRegister = async (req: Request, res: Response) => {
       authMethod: 'email',
       name: name ? name.trim() : `${firstName} ${lastName}`,
       firstName: firstName ? firstName.trim() : name?.split(' ')[0] || '',
-      lastName: lastName ? lastName.trim() : name?.split(' ').slice(1).join(' ') || '',
+      lastName: lastName
+        ? lastName.trim()
+        : name?.split(' ').slice(1).join(' ') || '',
       preferences: {
         theme: 'light',
         language: 'en',
@@ -168,8 +170,8 @@ export const emailLogin = async (req: Request, res: Response) => {
     const usersCollection = db.collection<User>('users');
 
     // Find user
-    const user = await usersCollection.findOne({ 
-      email: email.toLowerCase().trim() 
+    const user = await usersCollection.findOne({
+      email: email.toLowerCase().trim(),
     });
 
     if (!user || !user.password) {
