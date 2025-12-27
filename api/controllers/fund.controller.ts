@@ -340,13 +340,29 @@ export async function getFundById(req: Request, res: Response): Promise<void> {
     await mongodb.connect();
     const collection = mongodb.getCollection('funds');
 
-    // Try to find by fundId or amfiCode
-    const fund = await collection.findOne({
-      $or: [{ fundId: id }, { amfiCode: id }, { _id: id as any }],
+    // Try multiple ID formats - decode URL-encoded ID
+    const decodedId = decodeURIComponent(id);
+    
+    // Try to find by fundId, amfiCode, name match, or _id
+    let fund = await collection.findOne({
+      $or: [
+        { fundId: id },
+        { fundId: decodedId },
+        { amfiCode: id },
+        { amfiCode: decodedId },
+        { name: { $regex: decodedId.replace(/_/g, ' '), $options: 'i' } },
+      ],
     });
 
+    // If still not found, try exact name match
     if (!fund) {
-      console.log(`❌ Fund not found: ${id}`);
+      fund = await collection.findOne({
+        name: { $regex: decodedId.split('_').join('.*'), $options: 'i' },
+      });
+    }
+
+    if (!fund) {
+      console.log(`❌ Fund not found: ${id} (decoded: ${decodedId})`);
       res.status(404).json({
         success: false,
         error: 'Fund not found',
