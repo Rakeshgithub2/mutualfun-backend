@@ -14,14 +14,15 @@ import {
   resetPassword,
 } from '../controllers/auth.controller';
 import { googleLogin } from '../controllers/googleAuth';
+import { emailRegister, emailLogin } from '../controllers/emailAuth';
 import { authenticateToken } from '../middleware/auth.middleware';
 
 const router = Router();
 
 // Public routes - Authentication
-router.post('/register', register); // Email/Password registration with firstName/lastName
-router.post('/login', login); // Email/Password login
-router.post('/google', googleLogin); // 🚀 Production-ready Google OAuth
+router.post('/register', emailRegister); // ✅ Production-ready Email/Password registration
+router.post('/login', emailLogin); // ✅ Production-ready Email/Password login
+router.post('/google', googleLogin); // ✅ Production-ready Google OAuth
 router.post('/refresh', refreshToken); // Refresh access token
 
 // Password reset routes (public)
