@@ -550,3 +550,16 @@ export class FundDataService {
     return [...new Set(searchTerms)];
   }
 }
+
+/**
+ * Wrapper function for cron job usage
+ */
+export async function fetchAndUpdateFunds(): Promise<void> {
+  const { mongodb } = await import('../db/mongodb');
+  const db = mongodb.getDb();
+  const service = new FundDataService(db);
+
+  console.log('🔄 Fetching and updating funds...');
+  await service.fetchAMFIFunds();
+  console.log('✅ Funds updated successfully');
+}

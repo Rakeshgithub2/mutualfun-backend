@@ -7,8 +7,9 @@ import { mongodb } from './db/mongodb';
 import { redis } from './cache/redis';
 import { config } from './config/environment';
 
-// Import news cron job
+// Import cron jobs
 const newsCron = require('../cron/newsCron');
+const autoUpdateCron = require('../cron/autoUpdateCron');
 
 // Route imports
 import authRoutes from './routes/auth.routes';
@@ -20,6 +21,7 @@ import comparisonRoutes from './routes/comparison.routes';
 // import goalRoutes from './routes/goal.routes';
 // import managerRoutes from './routes/manager.routes';
 import marketIndicesRoutes from './routes/market-indices';
+import aiChatRoutes from './routes/ai.chat.routes';
 
 // Import news routes from old backend structure
 const newsRoutes = require('../routes/news');
@@ -131,10 +133,14 @@ app.use('/api/search', searchLimiter, searchRoutes);
 // app.use('/api/portfolio', authenticateToken, portfolioRoutes);  // TODO: Create route file
 // app.use('/api/watchlist', authenticateToken, watchlistRoutes);  // TODO: Create route file
 app.use('/api/comparison', comparisonRoutes);
+app.use('/api/compare', comparisonRoutes); // Alias for /api/comparison
+app.use('/api/overlap', comparisonRoutes); // Alias for /api/comparison
 // app.use('/api/goals', authenticateToken, goalRoutes);  // TODO: Create route file
 // app.use('/api/managers', managerRoutes);  // TODO: Create route file
 app.use('/api/market-indices', marketIndicesRoutes);
+app.use('/api/indices', marketIndicesRoutes); // Alias for /api/market-indices
 app.use('/api/news', newsRoutes); // News routes with cron job
+app.use('/api/chat', aiChatRoutes); // AI chatbot routes
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -194,11 +200,16 @@ async function startServer() {
       console.log('  - GET    /api/news');
       console.log('  - GET    /api/news/:id');
       console.log('  - POST   /api/news/refresh');
+      console.log('  - POST   /api/chat');
+      console.log('  - GET    /api/chat/suggestions');
+      console.log('  - POST   /api/chat/analyze-fund');
       console.log('\n🎯 Ready to accept requests!\n');
 
-      // Initialize news cron job after server starts
+      // Initialize cron jobs after server starts
       console.log('\n⏰ Initializing scheduled tasks...');
       newsCron.scheduleNewsFetch();
+      autoUpdateCron.scheduleAutoUpdates();
+      autoUpdateCron.scheduleMarketHoursUpdates();
       console.log('✅ All scheduled tasks initialized\n');
     });
 
