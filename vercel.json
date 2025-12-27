@@ -46,6 +46,10 @@
       "destination": "/api/google.ts"
     },
     {
+      "source": "/api/auth/google/callback",
+      "destination": "/api/index.ts"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/index.ts"
     },

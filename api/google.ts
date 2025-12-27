@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { mongodb } from '../src/db/mongodb';
 import { googleLogin } from '../src/controllers/googleAuth';
 
+const AuthController = require('../src/controllers/auth.controller');
+
 export default async function handler(req: Request, res: Response) {
   try {
     // Set CORS headers
@@ -9,6 +11,8 @@ export default async function handler(req: Request, res: Response) {
       'https://mf-frontend-coral.vercel.app',
       'https://mutual-fun-frontend-osed.vercel.app',
       'http://localhost:3000',
+      'http://localhost:5001',
+      'http://localhost:5173',
     ];
 
     const origin = req.headers.origin;
@@ -17,7 +21,7 @@ export default async function handler(req: Request, res: Response) {
       res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
 
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',
       'Content-Type, Authorization'
@@ -27,17 +31,26 @@ export default async function handler(req: Request, res: Response) {
       return res.status(200).end();
     }
 
-    if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Method not allowed' });
-    }
-
     // Connect to MongoDB
     await mongodb.connect();
 
-    // Call the Google login handler
-    await googleLogin(req, res);
+    // Handle GET request - initiate OAuth flow
+    if (req.method === 'GET') {
+      return await AuthController.googleAuth(req, res);
+    }
+
+    // Handle POST request - exchange token
+    if (req.method === 'POST') {
+      return await googleLogin(req, res);
+    }
+
+    return res.status(405).json({
+      success: false,
+      error: 'Method not allowed',
+      message: `Method ${req.method} not allowed`,
+    });
   } catch (error: any) {
-    console.error('Google login route error:', error);
+    console.error('Google auth route error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',

@@ -10,7 +10,10 @@ interface Fund {
   subCategory: string;
   fundType: string;
   fundHouse: string;
+  fundManager?: string;
   currentNav?: number;
+  previousNav?: number;
+  navDate?: Date;
   returns?: {
     day?: number;
     week?: number;
@@ -24,9 +27,12 @@ interface Fund {
   aum?: number;
   expenseRatio?: number;
   riskLevel?: string;
+  riskMetrics?: any;
+  ratings?: any;
   launchDate?: Date;
   benchmark?: string;
   minInvestment?: number;
+  sipMinAmount?: number;
   exitLoad?: number;
   holdings?: Array<{
     name: string;
@@ -38,7 +44,13 @@ interface Fund {
     sector: string;
     percentage: number;
   }>;
+  tags?: string[];
+  searchTerms?: string[];
+  popularity?: number;
   isActive: boolean;
+  dataSource?: string;
+  lastUpdated?: Date;
+  createdAt?: Date;
 }
 
 // Fetch and store funds from external API if DB is empty

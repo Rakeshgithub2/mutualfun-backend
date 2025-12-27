@@ -4,6 +4,7 @@ import authRoutes from '../src/routes/auth.routes';
 import fundRoutes from './routes/fund.routes';
 import compareRoutes from './routes/compare.routes';
 import overlapRoutes from './routes/overlap.routes';
+import marketIndexRoutes from './routes/marketIndex.routes';
 import { mongodb } from './db/mongodb';
 
 // Main Express application for Vercel serverless
@@ -14,6 +15,7 @@ app.use(
   cors({
     origin: [
       'http://localhost:3000',
+      'http://localhost:5001',
       'http://localhost:5173',
       'https://mf-frontend-coral.vercel.app',
       'https://mutual-fun-frontend-osed.vercel.app',
@@ -77,6 +79,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/funds', fundRoutes);
 app.use('/api/compare', compareRoutes);
 app.use('/api/overlap', overlapRoutes);
+app.use('/api/market', marketIndexRoutes);
 
 // 404 handler - return JSON, not HTML
 app.use((req: Request, res: Response) => {
@@ -94,6 +97,9 @@ app.use((req: Request, res: Response) => {
       'POST /api/auth/register',
       'POST /api/auth/login',
       'GET /api/auth/google',
+      'POST /api/auth/google',
+      'GET /api/market/indices',
+      'GET /api/market/summary',
     ],
   });
 });
