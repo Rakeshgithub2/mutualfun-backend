@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import authRoutes from '../src/routes/auth.routes';
 
@@ -17,7 +17,10 @@ app.use(
 
 app.use(express.json());
 
-// Route is /auth/google (Vercel adds /api prefix automatically)
-app.use('/auth', authRoutes);
+// Strip /api prefix since Vercel already adds it
+// When request comes as /api/auth/google, we mount at /api/auth
+app.use('/api/auth', authRoutes);
 
+// For Vercel serverless, export the Express app directly
+// Vercel's @vercel/node builder handles the conversion
 export default app;
