@@ -477,7 +477,8 @@ export async function getCurrentUser(
       });
     }
 
-    const user = await getAuthService().getUserById(userId);
+    const authSvc = await getAuthService();
+    const user = await authSvc.getUserById(userId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -573,7 +574,8 @@ export async function deleteAccount(
       });
     }
 
-    await getAuthService().deleteUser(userId);
+    const authSvc = await getAuthService();
+    await authSvc.deleteUser(userId);
 
     res.json({
       success: true,
@@ -617,7 +619,8 @@ export async function forgotPassword(
     }
 
     // Generate and send OTP
-    const result = await getAuthService().requestPasswordReset(
+    const authSvc = await getAuthService();
+    const result = await authSvc.requestPasswordReset(
       email.toLowerCase().trim()
     );
 
@@ -664,7 +667,8 @@ export async function verifyOTP(
       });
     }
 
-    const result = await getAuthService().verifyPasswordResetOTP(
+    const authSvc = await getAuthService();
+    const result = await authSvc.verifyPasswordResetOTP(
       email.toLowerCase().trim(),
       otp.trim()
     );
@@ -720,7 +724,8 @@ export async function resetPassword(
       });
     }
 
-    const result = await getAuthService().resetPasswordWithOTP(
+    const authSvc = await getAuthService();
+    const result = await authSvc.resetPasswordWithOTP(
       email.toLowerCase().trim(),
       otp.trim(),
       newPassword
