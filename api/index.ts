@@ -17,7 +17,7 @@ app.use(
 
 app.use(express.json());
 
-// THIS LINE CREATES /api/auth/google
-app.use('/api/auth', authRoutes);
+// Route is /auth/google (Vercel adds /api prefix automatically)
+app.use('/auth', authRoutes);
 
 export default app;
