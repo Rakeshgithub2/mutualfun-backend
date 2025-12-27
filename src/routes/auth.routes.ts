@@ -37,3 +37,5 @@ router.patch('/profile', authenticateToken, updateProfile);
 router.delete('/account', authenticateToken, deleteAccount);
 
 export default router;
+
+
