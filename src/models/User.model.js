@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
+      required: false, // Not required for Google OAuth users
     },
     firstName: {
       type: String,
@@ -31,6 +31,24 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    profilePicture: {
+      type: String,
+      trim: true,
+    },
+    authProvider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local',
+    },
+    googleId: {
+      type: String,
+      sparse: true,
+      unique: true,
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
     role: {
       type: String,
       enum: ['user', 'premium', 'admin'],
@@ -42,6 +60,22 @@ const userSchema = new mongoose.Schema(
     },
     lastLogin: {
       type: Date,
+    },
+    resetPasswordOTP: {
+      type: String,
+      select: false, // Don't include in queries by default
+    },
+    resetPasswordOTPExpiry: {
+      type: Date,
+      select: false,
+    },
+    resetPasswordToken: {
+      type: String,
+      select: false,
+    },
+    resetPasswordTokenExpiry: {
+      type: Date,
+      select: false,
     },
     preferences: {
       currency: {

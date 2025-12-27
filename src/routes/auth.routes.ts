@@ -13,6 +13,7 @@ import {
   verifyOTP,
   resetPassword,
 } from '../controllers/auth.controller';
+import { googleLogin } from '../controllers/googleAuth';
 import { authenticateToken } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -20,7 +21,7 @@ const router = Router();
 // Public routes - Authentication
 router.post('/register', register); // Email/Password registration with firstName/lastName
 router.post('/login', login); // Email/Password login
-router.post('/google', googleSignIn); // Google OAuth
+router.post('/google', googleLogin); // 🚀 Production-ready Google OAuth
 router.post('/refresh', refreshToken); // Refresh access token
 
 // Password reset routes (public)

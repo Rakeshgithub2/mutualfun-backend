@@ -1,11 +1,14 @@
 /**
  * Authentication Controller
- * Handles user registration, login, and token management
+ * Handles user registration, login, Google OAuth, and token management
  */
 
 const bcrypt = require('bcrypt');
+const axios = require('axios');
+const crypto = require('crypto');
 const { authConfig } = require('../config/auth.config');
 const User = require('../models/User.model');
+const EmailService = require('../services/email.service');
 
 class AuthController {
   /**
@@ -58,6 +61,11 @@ class AuthController {
       });
 
       await user.save();
+
+      // Send welcome email (don't wait for it)
+      EmailService.sendWelcomeEmail(user.email, user.firstName).catch((err) =>
+        console.error('Welcome email failed:', err)
+      );
 
       // Generate tokens
       const accessToken = authConfig.generateAccessToken({
@@ -360,6 +368,395 @@ class AuthController {
       res.status(500).json({
         success: false,
         error: 'Logout failed',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Initiate Google OAuth flow
+   * GET /api/auth/google
+   */
+  static async googleAuth(req, res) {
+    try {
+      const { GOOGLE_CLIENT_ID, GOOGLE_REDIRECT_URI } = process.env;
+
+      if (!GOOGLE_CLIENT_ID || !GOOGLE_REDIRECT_URI) {
+        return res.status(500).json({
+          success: false,
+          error: 'Google OAuth not configured',
+          message: 'Missing Google OAuth credentials',
+        });
+      }
+
+      // Build Google OAuth URL
+      const googleAuthUrl = new URL(
+        'https://accounts.google.com/o/oauth2/v2/auth'
+      );
+      googleAuthUrl.searchParams.append('client_id', GOOGLE_CLIENT_ID);
+      googleAuthUrl.searchParams.append('redirect_uri', GOOGLE_REDIRECT_URI);
+      googleAuthUrl.searchParams.append('response_type', 'code');
+      googleAuthUrl.searchParams.append('scope', 'email profile');
+      googleAuthUrl.searchParams.append('access_type', 'offline');
+      googleAuthUrl.searchParams.append('prompt', 'consent');
+
+      res.json({
+        success: true,
+        data: {
+          authUrl: googleAuthUrl.toString(),
+        },
+      });
+    } catch (error) {
+      console.error('Google OAuth initiation error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to initiate Google OAuth',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Handle Google OAuth callback
+   * GET /api/auth/google/callback
+   */
+  static async googleCallback(req, res) {
+    try {
+      const { code } = req.query;
+
+      if (!code) {
+        return res.redirect(
+          `${process.env.FRONTEND_URL}/auth/error?message=No authorization code received`
+        );
+      }
+
+      const {
+        GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET,
+        GOOGLE_REDIRECT_URI,
+        FRONTEND_URL,
+      } = process.env;
+
+      // Exchange authorization code for access token
+      const tokenResponse = await axios.post(
+        'https://oauth2.googleapis.com/token',
+        {
+          code,
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: GOOGLE_REDIRECT_URI,
+          grant_type: 'authorization_code',
+        }
+      );
+
+      const { access_token } = tokenResponse.data;
+
+      // Get user info from Google
+      const userInfoResponse = await axios.get(
+        'https://www.googleapis.com/oauth2/v2/userinfo',
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        }
+      );
+
+      const {
+        email,
+        given_name,
+        family_name,
+        picture,
+        id: googleId,
+      } = userInfoResponse.data;
+
+      // Find or create user
+      let user = await User.findOne({ email: email.toLowerCase() });
+
+      if (!user) {
+        // Create new user
+        user = new User({
+          email: email.toLowerCase(),
+          firstName: given_name,
+          lastName: family_name,
+          profilePicture: picture,
+          authProvider: 'google',
+          googleId,
+          role: 'user',
+          emailVerified: true, // Google emails are pre-verified
+        });
+        await user.save();
+      } else {
+        // Update existing user with Google data
+        user.authProvider = 'google';
+        user.googleId = googleId;
+        if (!user.profilePicture) user.profilePicture = picture;
+        user.lastLogin = new Date();
+        user.emailVerified = true;
+        await user.save();
+      }
+
+      // Generate JWT tokens
+      const accessToken = authConfig.generateAccessToken({
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+      });
+
+      const refreshToken = authConfig.generateRefreshToken({
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+      });
+
+      // Redirect to frontend with tokens
+      const redirectUrl = new URL(`${FRONTEND_URL}/auth/callback`);
+      redirectUrl.searchParams.append('accessToken', accessToken);
+      redirectUrl.searchParams.append('refreshToken', refreshToken);
+
+      res.redirect(redirectUrl.toString());
+    } catch (error) {
+      console.error('Google OAuth callback error:', error);
+      const errorMessage = encodeURIComponent(
+        error.message || 'Google authentication failed'
+      );
+      res.redirect(
+        `${process.env.FRONTEND_URL}/auth/error?message=${errorMessage}`
+      );
+    }
+  }
+
+  /**
+   * Forgot Password - Step 1: Send OTP
+   * POST /api/auth/forgot-password
+   */
+  static async forgotPassword(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing email',
+          message: 'Email is required',
+        });
+      }
+
+      // Find user
+      const user = await User.findOne({ email: email.toLowerCase() });
+      if (!user) {
+        // Don't reveal if user exists for security
+        return res.json({
+          success: true,
+          message:
+            'If an account exists with this email, you will receive an OTP',
+        });
+      }
+
+      // Check if user is a Google OAuth user
+      if (user.authProvider === 'google') {
+        return res.status(400).json({
+          success: false,
+          error: 'Google account',
+          message:
+            'Please use Google to sign in. Password reset is not available for Google accounts.',
+        });
+      }
+
+      // Generate 6-digit OTP
+      const otp = crypto.randomInt(100000, 999999).toString();
+      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Store OTP in user document
+      user.resetPasswordOTP = otp;
+      user.resetPasswordOTPExpiry = otpExpiry;
+      await user.save();
+
+      // Send OTP email
+      const emailResult = await EmailService.sendPasswordResetOTP(
+        user.email,
+        otp,
+        user.firstName
+      );
+
+      if (!emailResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: 'Email sending failed',
+          message: 'Failed to send OTP. Please try again.',
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'OTP sent to your email. Valid for 10 minutes.',
+      });
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to process request',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Verify OTP - Step 2
+   * POST /api/auth/verify-otp
+   */
+  static async verifyOTP(req, res) {
+    try {
+      const { email, otp } = req.body;
+
+      if (!email || !otp) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing fields',
+          message: 'Email and OTP are required',
+        });
+      }
+
+      // Find user
+      const user = await User.findOne({ email: email.toLowerCase() });
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+          message: 'Invalid email',
+        });
+      }
+
+      // Check if OTP exists
+      if (!user.resetPasswordOTP || !user.resetPasswordOTPExpiry) {
+        return res.status(400).json({
+          success: false,
+          error: 'No OTP requested',
+          message: 'Please request a password reset first',
+        });
+      }
+
+      // Check if OTP expired
+      if (new Date() > user.resetPasswordOTPExpiry) {
+        return res.status(400).json({
+          success: false,
+          error: 'OTP expired',
+          message: 'OTP has expired. Please request a new one.',
+        });
+      }
+
+      // Verify OTP
+      if (user.resetPasswordOTP !== otp) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid OTP',
+          message: 'The OTP you entered is incorrect',
+        });
+      }
+
+      // Generate a temporary token for password reset
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      user.resetPasswordToken = resetToken;
+      user.resetPasswordTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      await user.save();
+
+      res.json({
+        success: true,
+        message: 'OTP verified successfully',
+        data: {
+          resetToken, // Frontend will use this to reset password
+        },
+      });
+    } catch (error) {
+      console.error('Verify OTP error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to verify OTP',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Reset Password - Step 3: Set new password
+   * POST /api/auth/reset-password
+   */
+  static async resetPassword(req, res) {
+    try {
+      const { email, resetToken, newPassword } = req.body;
+
+      if (!email || !resetToken || !newPassword) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing fields',
+          message: 'Email, reset token, and new password are required',
+        });
+      }
+
+      // Validate password strength
+      const passwordValidation = authConfig.validatePassword(newPassword);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({
+          success: false,
+          error: 'Weak password',
+          message: passwordValidation.errors,
+        });
+      }
+
+      // Find user
+      const user = await User.findOne({ email: email.toLowerCase() });
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+          message: 'Invalid email',
+        });
+      }
+
+      // Verify reset token
+      if (!user.resetPasswordToken || user.resetPasswordToken !== resetToken) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid token',
+          message: 'Invalid or expired reset token',
+        });
+      }
+
+      // Check if token expired
+      if (new Date() > user.resetPasswordTokenExpiry) {
+        return res.status(400).json({
+          success: false,
+          error: 'Token expired',
+          message: 'Reset token has expired. Please start over.',
+        });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      user.password = hashedPassword;
+
+      // Clear reset tokens
+      user.resetPasswordOTP = undefined;
+      user.resetPasswordOTPExpiry = undefined;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordTokenExpiry = undefined;
+
+      await user.save();
+
+      // Send confirmation email (don't wait for it)
+      EmailService.sendPasswordChangedEmail(user.email, user.firstName).catch(
+        (err) => console.error('Password changed email failed:', err)
+      );
+
+      res.json({
+        success: true,
+        message:
+          'Password reset successful. You can now login with your new password.',
+      });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to reset password',
         message: error.message,
       });
     }
