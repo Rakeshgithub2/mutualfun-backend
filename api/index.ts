@@ -6,6 +6,7 @@ import compareRoutes from './routes/compare.routes';
 import overlapRoutes from './routes/overlap.routes';
 import { mongodb } from './db/mongodb';
 
+// Main Express application for Vercel serverless
 const app = express();
 
 // CORS Configuration
