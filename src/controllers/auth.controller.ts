@@ -10,6 +10,12 @@ async function getAuthService() {
   if (!mongodb.isConnected()) {
     await mongodb.connect();
   }
+  
+  // Create AuthService instance if not exists
+  if (!authService) {
+    authService = new AuthService(mongodb.getDb());
+  }
+  
   return authService;
 }
 
