@@ -7,10 +7,8 @@ import { emailService } from '../services/emailService';
 let authService: AuthService;
 async function getAuthService() {
   // Ensure MongoDB connection for serverless
-  await mongodb.connect();
-  
-  if (!authService) {
-    authService = new AuthService(mongodb.getDb());
+  if (!mongodb.isConnected()) {
+    await mongodb.connect();
   }
   return authService;
 }
@@ -252,17 +250,11 @@ export async function googleSignIn(
     const userAgent = req.headers['user-agent'] || 'unknown';
 
     // Check if this is a new user
-    const existingUser = await authSvc.getUserByEmail(
-      googleData.email
-    );
+    const existingUser = await authSvc.getUserByEmail(googleData.email);
     const isNewUser = !existingUser;
 
     // Find or create user
-    const user = await authSvc.findOrCreateUser(
-      googleData,
-      ip,
-      userAgent
-    );
+    const user = await authSvc.findOrCreateUser(googleData, ip, userAgent);
 
     // Send welcome email for new users
     if (isNewUser) {
@@ -541,10 +533,7 @@ export async function updateProfile(
     }
 
     const authSvc = await getAuthService();
-    const updatedUser = await authSvc.updateUserProfile(
-      userId,
-      updates
-    );
+    const updatedUser = await authSvc.updateUserProfile(userId, updates);
 
     res.json({
       success: true,
