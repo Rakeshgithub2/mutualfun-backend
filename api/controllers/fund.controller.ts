@@ -342,7 +342,7 @@ export async function getFundById(req: Request, res: Response): Promise<void> {
 
     // Try multiple ID formats - decode URL-encoded ID
     const decodedId = decodeURIComponent(id);
-    
+
     // Try to find by fundId, amfiCode, name match, or _id
     let fund = await collection.findOne({
       $or: [
