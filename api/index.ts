@@ -1,6 +1,7 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import authRoutes from '../src/routes/auth.routes';
+import { mongodb } from '../src/db/mongodb';
 
 const app = express();
 
@@ -16,6 +17,21 @@ app.use(
 );
 
 app.use(express.json());
+
+// MongoDB connection middleware for serverless
+app.use(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await mongodb.connect();
+    next();
+  } catch (error: any) {
+    console.error('MongoDB connection error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Database connection failed',
+      message: error.message,
+    });
+  }
+});
 
 // Strip /api prefix since Vercel already adds it
 // When request comes as /api/auth/google, we mount at /api/auth
