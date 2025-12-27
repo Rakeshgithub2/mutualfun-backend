@@ -51,7 +51,11 @@ export const emailRegister = async (req: Request, res: Response) => {
     }
 
     // Get users collection
+    console.log('[emailRegister] About to call mongodb.getDb(), isConnected:', mongodb.isConnected());
+    await mongodb.connect(); // Explicitly connect
+    console.log('[emailRegister] After connect(), isConnected:', mongodb.isConnected());
     const db = mongodb.getDb();
+    console.log('[emailRegister] Got DB successfully');
     const usersCollection = db.collection<User>('users');
 
     // Check if user already exists
@@ -166,7 +170,11 @@ export const emailLogin = async (req: Request, res: Response) => {
     }
 
     // Get users collection
+    console.log('[emailLogin] About to call mongodb.getDb(), isConnected:', mongodb.isConnected());
+    await mongodb.connect(); // Explicitly connect
+    console.log('[emailLogin] After connect(), isConnected:', mongodb.isConnected());
     const db = mongodb.getDb();
+    console.log('[emailLogin] Got DB successfully');
     const usersCollection = db.collection<User>('users');
 
     // Find user
