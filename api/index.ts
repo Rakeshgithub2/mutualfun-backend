@@ -21,9 +21,14 @@ app.use(express.json());
 // MongoDB connection middleware for serverless
 app.use(async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log(`[Middleware] Connecting MongoDB for ${req.method} ${req.path}`);
+    console.log(
+      `[Middleware] Connecting MongoDB for ${req.method} ${req.path}`
+    );
     await mongodb.connect();
-    console.log('[Middleware] MongoDB connected, isConnected:', mongodb.isConnected());
+    console.log(
+      '[Middleware] MongoDB connected, isConnected:',
+      mongodb.isConnected()
+    );
     next();
   } catch (error: any) {
     console.error('MongoDB connection error:', error);
@@ -43,7 +48,7 @@ app.get('/api/test-db', async (req: Request, res: Response) => {
     res.json({
       success: true,
       message: 'Database connected',
-      collections: collections.map(c => c.name),
+      collections: collections.map((c) => c.name),
     });
   } catch (error: any) {
     res.status(500).json({

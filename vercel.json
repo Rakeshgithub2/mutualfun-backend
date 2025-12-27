@@ -18,6 +18,18 @@
       "destination": "/api/health.ts"
     },
     {
+      "source": "/api/auth/register",
+      "destination": "/api/register.ts"
+    },
+    {
+      "source": "/api/auth/login",
+      "destination": "/api/login.ts"
+    },
+    {
+      "source": "/api/auth/google",
+      "destination": "/api/google.ts"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/index.ts"
     },
