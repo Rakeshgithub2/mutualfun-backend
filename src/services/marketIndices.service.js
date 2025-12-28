@@ -115,6 +115,10 @@ class MarketIndicesService {
 
       const response = await axios.get(url, {
         timeout: 10000,
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
       });
 
       const quote = response.data.chart.result[0];
@@ -130,7 +134,7 @@ class MarketIndicesService {
           100,
         high: meta.regularMarketDayHigh,
         low: meta.regularMarketDayLow,
-        open: indicators.open[0],
+        open: indicators.open[indicators.open.length - 1],
         previousClose: meta.previousClose,
         volume: meta.regularMarketVolume,
       };
@@ -144,23 +148,97 @@ class MarketIndicesService {
   }
 
   /**
-   * Update single index
+   * Fetch from RapidAPI NSE (Paid but reliable)
+   */
+  async fetchFromRapidAPI(indexName) {
+    try {
+      const apiKey = process.env.RAPIDAPI_KEY;
+      if (!apiKey) {
+        console.log('⚠️  RAPIDAPI_KEY not configured');
+        return null;
+      }
+
+      const symbolMap = {
+        'NIFTY 50': 'NIFTY 50',
+        SENSEX: 'SENSEX',
+        'NIFTY BANK': 'NIFTY BANK',
+      };
+
+      const response = await axios.get(
+        'https://latest-stock-price.p.rapidapi.com/equities-indices',
+        {
+          headers: {
+            'X-RapidAPI-Key': apiKey,
+            'X-RapidAPI-Host': 'latest-stock-price.p.rapidapi.com',
+          },
+          params: {
+            Index: symbolMap[indexName],
+          },
+          timeout: 10000,
+        }
+      );
+
+      const data = response.data[0];
+      if (!data) return null;
+
+      return {
+        value: data.lastPrice,
+        change: data.change,
+        changePercent: data.pChange,
+        high: data.dayHigh,
+        low: data.dayLow,
+        open: data.open,
+        previousClose: data.previousClose,
+        volume: data.totalTradedVolume,
+      };
+    } catch (error) {
+      console.error(`RapidAPI fetch failed for ${indexName}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Update single index with multi-source fallback
    */
   async updateIndex(indexName, symbol, yahooSymbol) {
     try {
       const isOpen = this.isMarketOpen();
+      let data = null;
+      let source = 'unknown';
 
-      // Try NSE first
-      let data = await this.fetchNSEData(symbol);
+      // Try multiple sources in order
+      console.log(`🔄 Fetching ${indexName}...`);
+
+      // Try RapidAPI first (most reliable for Indian markets)
+      data = await this.fetchFromRapidAPI(indexName);
+      if (data) {
+        source = 'RapidAPI';
+        console.log(`✅ RapidAPI succeeded for ${indexName}`);
+      }
 
       // Fallback to Yahoo Finance
       if (!data) {
+        console.log(`⚠️  RapidAPI failed, trying Yahoo Finance...`);
         data = await this.fetchYahooFinanceData(yahooSymbol);
+        if (data) {
+          source = 'Yahoo Finance';
+          console.log(`✅ Yahoo Finance succeeded for ${indexName}`);
+        }
+      }
+
+      // Fallback to NSE (if configured)
+      if (!data) {
+        console.log(`⚠️  Yahoo Finance failed, trying NSE...`);
+        data = await this.fetchNSEData(symbol);
+        if (data) {
+          source = 'NSE';
+          console.log(`✅ NSE succeeded for ${indexName}`);
+        }
       }
 
       if (!data) {
-        console.log(
-          `⚠️  No data available for ${indexName}, using cached values`
+        console.error(
+          `❌ ALL SOURCES FAILED for ${indexName}. Keeping cached values.`
         );
         return;
       }
@@ -180,12 +258,13 @@ class MarketIndicesService {
           volume: data.volume,
           lastUpdated: new Date(),
           isMarketOpen: isOpen,
+          dataSource: source, // Track which API worked
         },
         { upsert: true, new: true }
       );
 
       console.log(
-        `✅ Updated ${indexName}: ${data.value} (${data.changePercent > 0 ? '+' : ''}${data.changePercent.toFixed(2)}%)`
+        `✅ Updated ${indexName} from ${source}: ${data.value} (${data.changePercent > 0 ? '+' : ''}${data.changePercent.toFixed(2)}%)`
       );
     } catch (error) {
       console.error(`❌ Error updating ${indexName}:`, error.message);
@@ -237,8 +316,26 @@ class MarketIndicesService {
       const indices = await MarketIndex.find().sort({ index: 1 }).lean();
 
       if (indices.length === 0) {
-        // Return default values if no data
+        console.warn(
+          '⚠️  No indices in database! Returning defaults. Run forceInitialUpdate()'
+        );
         return this.getDefaultIndices();
+      }
+
+      // Check if data is fresh (updated in last 6 hours)
+      const now = Date.now();
+      const staleIndices = indices.filter(
+        (idx) => now - new Date(idx.lastUpdated).getTime() > 6 * 60 * 60 * 1000
+      );
+
+      if (staleIndices.length > 0) {
+        console.warn(
+          `⚠️  ${staleIndices.length} indices are stale (>6 hours old). Triggering update...`
+        );
+        // Non-blocking background update
+        this.updateAllIndices().catch((err) =>
+          console.error('Background update failed:', err)
+        );
       }
 
       return indices.map((idx) => ({
@@ -252,6 +349,7 @@ class MarketIndicesService {
         previousClose: idx.previousClose,
         lastUpdated: idx.lastUpdated,
         isMarketOpen: idx.isMarketOpen,
+        dataSource: idx.dataSource || 'legacy',
       }));
     } catch (error) {
       console.error('Error fetching indices:', error);
@@ -263,6 +361,7 @@ class MarketIndicesService {
    * Default/fallback indices
    */
   getDefaultIndices() {
+    console.warn('⚠️  USING STATIC DEFAULT VALUES - API fetch may have failed');
     return [
       {
         index: 'NIFTY 50',
@@ -270,6 +369,7 @@ class MarketIndicesService {
         change: 0,
         changePercent: 0,
         isMarketOpen: false,
+        dataSource: 'fallback',
       },
       {
         index: 'SENSEX',
@@ -277,6 +377,7 @@ class MarketIndicesService {
         change: 0,
         changePercent: 0,
         isMarketOpen: false,
+        dataSource: 'fallback',
       },
       {
         index: 'NIFTY BANK',
@@ -284,8 +385,40 @@ class MarketIndicesService {
         change: 0,
         changePercent: 0,
         isMarketOpen: false,
+        dataSource: 'fallback',
       },
     ];
+  }
+
+  /**
+   * Force update on server start
+   */
+  async forceInitialUpdate() {
+    console.log('🚀 FORCING INITIAL MARKET DATA FETCH...');
+    await this.updateAllIndices();
+
+    // Verify data is not static
+    const indices = await MarketIndex.find();
+    const hasRealData = indices.some(
+      (idx) =>
+        idx.value !== 21500 &&
+        idx.value !== 71000 &&
+        idx.value !== 45000 &&
+        Math.abs(idx.changePercent) > 0.01 // Allow small variations
+    );
+
+    if (!hasRealData && indices.length > 0) {
+      console.error(
+        '⚠️  WARNING: Market data still appears static after initial fetch!'
+      );
+      console.error('Check API keys in .env:');
+      console.error('- RAPIDAPI_KEY=your_key_here');
+      console.error(
+        'Get free key at: https://rapidapi.com/suneetk92/api/latest-stock-price'
+      );
+    } else if (hasRealData) {
+      console.log('✅ Market data verified as REAL (not static)');
+    }
   }
 
   /**

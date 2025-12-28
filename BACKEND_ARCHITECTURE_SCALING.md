@@ -116,21 +116,21 @@
   fundId: String,           // Unique, indexed
   schemeCode: String,       // AMFI scheme code, indexed
   isin: String,             // ISIN code
-  
+
   // Basic Info
   name: String,             // Text indexed for search
   category: String,         // Indexed: 'equity', 'debt', etc.
   subCategory: String,      // Indexed: 'Large Cap', 'Mid Cap'
   fundHouse: String,        // Indexed: 'HDFC', 'ICICI', etc.
   fundType: String,         // 'mutual_fund', 'etf'
-  
+
   // NAV Data
   currentNav: Number,
   previousNav: Number,
   navDate: Date,            // Indexed for time-based queries
   navChange: Number,
   navChangePercent: Number,
-  
+
   // Returns
   returns: {
     day: Number,
@@ -143,7 +143,7 @@
     fiveYear: Number,
     sinceInception: Number
   },
-  
+
   // Risk Metrics
   riskMetrics: {
     sharpeRatio: Number,
@@ -153,7 +153,7 @@
     rSquared: Number,
     sortino: Number
   },
-  
+
   // Holdings (Top 15)
   holdings: [{
     companyName: String,
@@ -163,14 +163,14 @@
     quantity: Number,
     lastUpdated: Date
   }],
-  
+
   // Sector Allocation
   sectorAllocation: [{
     sector: String,
     percentage: Number,
     amount: Number
   }],
-  
+
   // Asset Allocation
   assetAllocation: {
     equity: Number,
@@ -178,7 +178,7 @@
     cash: Number,
     others: Number
   },
-  
+
   // Fund Manager
   fundManager: {
     name: String,
@@ -186,32 +186,32 @@
     since: Date,
     qualification: String
   },
-  
+
   // Financial Details
   aum: Number,              // Indexed for sorting
   expenseRatio: Number,
   exitLoad: String,
   minInvestment: Number,
   sipMinAmount: Number,
-  
+
   // Ratings
   ratings: {
     morningstar: Number,
     crisil: Number,
     valueResearch: Number
   },
-  
+
   // Metadata
   status: String,           // 'Active', 'Suspended', 'Closed'
   inceptionDate: Date,
   tags: [String],
   popularity: Number,       // View count for trending
-  
+
   // Auto-Fetch Tracking
   dataSource: String,       // 'seeded', 'amfi', 'mfcentral'
   lastFetched: Date,        // When data was last updated
   fetchCount: Number,       // How many times fetched
-  
+
   // Timestamps
   createdAt: Date,
   updatedAt: Date
@@ -224,11 +224,11 @@
 // Create indexes for fast queries
 db.funds.createIndex({ fundId: 1 }, { unique: true });
 db.funds.createIndex({ schemeCode: 1 });
-db.funds.createIndex({ name: "text", fundHouse: "text" }); // Text search
+db.funds.createIndex({ name: 'text', fundHouse: 'text' }); // Text search
 db.funds.createIndex({ category: 1, subCategory: 1 });
 db.funds.createIndex({ fundHouse: 1 });
 db.funds.createIndex({ aum: -1 }); // For sorting by AUM
-db.funds.createIndex({ "returns.oneYear": -1 }); // For sorting by returns
+db.funds.createIndex({ 'returns.oneYear': -1 }); // For sorting by returns
 db.funds.createIndex({ status: 1 });
 db.funds.createIndex({ navDate: -1 });
 db.funds.createIndex({ popularity: -1 }); // For trending funds
@@ -251,15 +251,15 @@ db.funds.createIndex({ lastFetched: 1 }); // For stale data detection
   open: Number,
   previousClose: Number,
   volume: Number,
-  
+
   // Market Status
   isMarketOpen: Boolean,
   lastTradedTime: Date,
-  
+
   // Metadata
   lastUpdated: Date,
   dataSource: String,       // 'nse', 'bse', 'yahoo'
-  
+
   // TTL for auto-cleanup
   expiresAt: Date           // Auto-delete after 24 hours
 }
@@ -282,7 +282,7 @@ db.marketIndices.createIndex({ index: 1 }, { unique: true });
   change: Number,
   changePercent: Number,
   volume: Number,
-  
+
   createdAt: Date
 }
 
@@ -304,7 +304,7 @@ db.historicalNAV.createIndex({ date: -1 });
   ipAddress: String,
   statusCode: Number,
   responseTime: Number,     // In milliseconds
-  
+
   // For rate limiting
   timestamp: Date,
   expiresAt: Date           // TTL: 1 hour
@@ -326,7 +326,7 @@ db.apiLogs.createIndex({ ipAddress: 1, timestamp: -1 });
   apiProvider: String,      // 'amfi', 'mfcentral', 'rapidapi'
   responseData: Object,     // Raw API response
   normalized: Boolean,      // Whether data has been normalized
-  
+
   // TTL
   cachedAt: Date,
   expiresAt: Date           // TTL: 1 hour
@@ -815,7 +815,7 @@ GET /api/funds?page=1&limit=20&category=equity&sortBy=aum
       "fundId": "MF12345",
       "name": "HDFC Top 100 Fund",
       "category": "equity",
-      "currentNav": 825.50,
+      "currentNav": 825.5,
       "returns": { "oneYear": 15.5 }
     }
   ],
@@ -833,6 +833,7 @@ GET /api/funds?page=1&limit=20&category=equity&sortBy=aum
 ```
 
 **Features:**
+
 - ✅ No hardcoded limit (max 500)
 - ✅ Cursor-based pagination support
 - ✅ Multiple sort options
@@ -866,6 +867,7 @@ GET /api/funds/search?q=hdfc&limit=10
 ```
 
 **Features:**
+
 - ✅ Text search on name + fundHouse
 - ✅ Typo-tolerant (fuzzy matching)
 - ✅ Fast (<50ms response)
@@ -914,7 +916,7 @@ GET /api/market/summary
     {
       "index": "NIFTY 50",
       "value": 21453.75,
-      "change": 123.50,
+      "change": 123.5,
       "changePercent": 0.58,
       "isMarketOpen": true,
       "lastUpdated": "2025-12-28T15:30:00Z"
@@ -926,6 +928,7 @@ GET /api/market/summary
 ```
 
 **Features:**
+
 - ✅ Auto-updates every 2 hours
 - ✅ Holiday detection
 - ✅ Returns last close if market closed
@@ -954,6 +957,7 @@ GET /health
 ```
 
 **Optimizations:**
+
 - ✅ Non-blocking checks
 - ✅ Timeout: 2 seconds
 - ✅ No dependency on external APIs
@@ -966,6 +970,7 @@ GET /health
 ### Why Indices May Be Static
 
 Market indices are static on:
+
 - **Weekends** (Saturday, Sunday)
 - **Public holidays** (BSE/NSE holiday calendar)
 - **Non-trading hours** (before 9 AM, after 3:30 PM)
@@ -1100,6 +1105,7 @@ Failed to fetch /health
 ```
 
 **Possible Causes:**
+
 1. **Vercel Cold Start** - Function takes >10s to start
 2. **Timeout** - Health check takes too long
 3. **CORS** - Missing CORS headers
@@ -1233,7 +1239,7 @@ M10 Cluster (Shared)
 ```javascript
 // Only create essential indexes
 db.funds.createIndex({ fundId: 1 }, { unique: true });
-db.funds.createIndex({ name: "text" }); // For search
+db.funds.createIndex({ name: 'text' }); // For search
 db.funds.createIndex({ category: 1, subCategory: 1 });
 db.funds.createIndex({ aum: -1 });
 
@@ -1376,14 +1382,14 @@ exports.searchRateLimit = rateLimit({
 
 ### Performance Targets
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| **API Response Time** | ~200ms | <100ms |
-| **Cache Hit Rate** | 0% | >80% |
-| **Database Queries/sec** | 10 | 100+ |
-| **Auto-Fetch Success Rate** | N/A | >95% |
-| **Concurrent Users** | 10 | 1000+ |
-| **Monthly Cost** | Free | <$100 |
+| Metric                      | Current | Target |
+| --------------------------- | ------- | ------ |
+| **API Response Time**       | ~200ms  | <100ms |
+| **Cache Hit Rate**          | 0%      | >80%   |
+| **Database Queries/sec**    | 10      | 100+   |
+| **Auto-Fetch Success Rate** | N/A     | >95%   |
+| **Concurrent Users**        | 10      | 1000+  |
+| **Monthly Cost**            | Free    | <$100  |
 
 ### Monitoring
 

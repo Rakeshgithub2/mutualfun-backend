@@ -31,6 +31,18 @@ async function initializeDatabase() {
   }
 }
 
+// Initialize market indices with force update
+async function initializeMarketIndices() {
+  try {
+    console.log('📈 Initializing market indices...');
+    await marketIndicesService.forceInitialUpdate();
+    console.log('✅ Market indices initialized');
+  } catch (error) {
+    console.error('⚠️  Failed to initialize market indices:', error);
+    console.log('📊 Will use cached/default values');
+  }
+}
+
 // Security middleware
 app.use(helmet());
 app.use(
@@ -139,7 +151,10 @@ if (process.env.NODE_ENV !== 'test') {
 
   // Initialize database first, then start server
   initializeDatabase()
-    .then(() => {
+    .then(async () => {
+      // Initialize market indices data
+      await initializeMarketIndices();
+
       const server = httpServer.listen(Number(PORT), '0.0.0.0', () => {
         console.log(`✅ Server is running on http://0.0.0.0:${PORT}`);
         console.log(`✅ Server is running on http://localhost:${PORT}`);

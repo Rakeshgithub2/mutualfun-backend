@@ -17,7 +17,7 @@ const getFundsSchema = z.object({
   subCategory: z.string().optional(), // Add subCategory support
   top: z.enum(['20', '50', '100']).optional(), // Add top funds filter
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(2500).default(20),
+  limit: z.coerce.number().min(1).max(5000).default(100), // Increased from 20 to 100, max from 2500 to 5000
   sort: z.string().optional(),
 });
 

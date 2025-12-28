@@ -542,7 +542,7 @@ export class FundModel {
     return await this.collection
       .find(query)
       .sort(sort)
-      .limit(options.limit || 100)
+      .limit(options.limit || 5000) // Increased from 100 to 5000 to support 4000+ funds
       .skip(options.skip || 0)
       .toArray();
   }
