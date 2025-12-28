@@ -13,6 +13,7 @@
 **Issue**: Production database severely under-populated
 
 **Evidence**:
+
 ```bash
 # Test command
 curl "https://mutualfun-backend.vercel.app/api/funds?limit=1"
@@ -43,6 +44,7 @@ curl "https://mutualfun-backend.vercel.app/api/funds?limit=1"
 **Issue**: `/api/market/summary` endpoint returns empty array
 
 **Evidence**:
+
 ```bash
 # Test command
 curl "https://mutualfun-backend.vercel.app/api/market/summary"
@@ -55,19 +57,20 @@ curl "https://mutualfun-backend.vercel.app/api/market/summary"
 ```
 
 **Expected**: Array of market indices with live data:
+
 ```json
 {
   "data": [
     {
       "index": "NIFTY 50",
-      "value": 21000.50,
+      "value": 21000.5,
       "change": 150.25,
       "changePercent": 0.72
     },
     {
       "index": "SENSEX",
       "value": 70000.25,
-      "change": 200.50,
+      "change": 200.5,
       "changePercent": 0.29
     }
   ]
@@ -78,6 +81,7 @@ curl "https://mutualfun-backend.vercel.app/api/market/summary"
 **Impact**: Frontend displays static fallback values instead of live market data
 
 **Possible Root Causes**:
+
 - External API integration not working (NSE/Yahoo Finance)
 - Missing or invalid API keys in production environment
 - Service not configured in production
@@ -90,6 +94,7 @@ curl "https://mutualfun-backend.vercel.app/api/market/summary"
 **Issue**: Backend ignores `limit` parameter when > 100
 
 **Evidence**:
+
 ```bash
 # Request 200 funds
 curl "https://mutualfun-backend.vercel.app/api/funds?limit=200"
@@ -108,6 +113,7 @@ curl "https://mutualfun-backend.vercel.app/api/funds?limit=200"
 **Impact**: Inefficient pagination, more API calls needed, slower performance
 
 **Fix Required**: Update pagination middleware to allow higher limits:
+
 ```javascript
 // In pagination middleware or controller
 const MAX_LIMIT = 500; // Increase from 100
@@ -121,12 +127,14 @@ const limit = Math.min(parseInt(req.query.limit) || 20, MAX_LIMIT);
 **Issue**: Frontend was calling `/api/api/funds` (double `/api`)
 
 **Root Cause**: `.env.production` had:
+
 ```bash
 # ❌ WRONG
 VITE_API_URL=https://mutualfun-backend.vercel.app/api
 ```
 
 **Fix Applied**:
+
 ```bash
 # ✅ CORRECT
 VITE_API_URL=https://mutualfun-backend.vercel.app
@@ -143,11 +151,13 @@ VITE_API_URL=https://mutualfun-backend.vercel.app
 **Action Required**: Seed production database with complete dataset
 
 **Steps**:
+
 1. Run seeding script on production database
 2. Verify all 4,459 funds are inserted
 3. Ensure proper indexing for performance
 
 **Commands** (adjust for your deployment):
+
 ```bash
 # If using remote MongoDB
 mongoimport --uri "mongodb+srv://production-connection-string" \
@@ -160,6 +170,7 @@ NODE_ENV=production node scripts/seed-production-db.js
 ```
 
 **Verification**:
+
 ```bash
 curl "https://mutualfun-backend.vercel.app/api/funds?limit=1" | jq '.pagination.total'
 # Should return: 4459
@@ -170,6 +181,7 @@ curl "https://mutualfun-backend.vercel.app/api/funds?limit=1" | jq '.pagination.
 ### Priority 2: Fix Market Indices Service
 
 **Files to Check**:
+
 - `src/services/marketIndices.service.ts`
 - `src/controllers/market.controller.ts`
 - `src/routes/market.routes.ts`
@@ -177,6 +189,7 @@ curl "https://mutualfun-backend.vercel.app/api/funds?limit=1" | jq '.pagination.
 **Debugging Steps**:
 
 1. **Check External API Integration**:
+
 ```javascript
 // In marketIndices.service.ts
 try {
@@ -189,6 +202,7 @@ try {
 ```
 
 2. **Verify API Keys**:
+
 ```bash
 # Check production environment variables
 # Ensure these are set in Vercel:
@@ -198,6 +212,7 @@ YAHOO_FINANCE_KEY=your_key_here
 ```
 
 3. **Test Endpoint Locally**:
+
 ```bash
 # Run backend with production environment
 NODE_ENV=production npm run dev
@@ -207,6 +222,7 @@ curl http://localhost:3002/api/market/summary
 ```
 
 4. **Add Fallback Data**:
+
 ```javascript
 // If external API fails, return cached/default data
 const getMarketIndices = async () => {
@@ -229,22 +245,22 @@ const getMarketIndices = async () => {
 **File**: `src/middleware/pagination.ts` or similar
 
 **Current Code** (likely):
+
 ```javascript
 const MAX_LIMIT = 100; // ❌ Too restrictive
 const limit = Math.min(parseInt(req.query.limit) || 20, MAX_LIMIT);
 ```
 
 **Required Change**:
+
 ```javascript
 const MAX_LIMIT = 500; // ✅ More reasonable
 const DEFAULT_LIMIT = 20;
-const limit = Math.min(
-  parseInt(req.query.limit) || DEFAULT_LIMIT,
-  MAX_LIMIT
-);
+const limit = Math.min(parseInt(req.query.limit) || DEFAULT_LIMIT, MAX_LIMIT);
 ```
 
 **Considerations**:
+
 - Balance between performance and data transfer
 - Add response caching for large results
 - Consider implementing cursor-based pagination for better performance
@@ -254,30 +270,35 @@ const limit = Math.min(
 ## 📊 TESTING COMMANDS
 
 ### Test Fund Count
+
 ```bash
 # Should return 4459
 curl "https://mutualfun-backend.vercel.app/api/funds?limit=1" | jq '.pagination.total'
 ```
 
 ### Test Market Indices
+
 ```bash
 # Should return array with market data
 curl "https://mutualfun-backend.vercel.app/api/market/summary" | jq '.data | length'
 ```
 
 ### Test Pagination Limit
+
 ```bash
 # Should respect limit=200
 curl "https://mutualfun-backend.vercel.app/api/funds?limit=200" | jq '.pagination.limit'
 ```
 
 ### Test Category Filters
+
 ```bash
 # Should return equity funds only
 curl "https://mutualfun-backend.vercel.app/api/funds?category=equity&limit=5"
 ```
 
 ### Test Search
+
 ```bash
 # Should return matching funds
 curl "https://mutualfun-backend.vercel.app/api/search/suggest?query=hdfc"
@@ -290,6 +311,7 @@ curl "https://mutualfun-backend.vercel.app/api/search/suggest?query=hdfc"
 **Frontend is correctly configured** and will work perfectly once backend issues are resolved.
 
 **What Frontend Currently Does**:
+
 - ✅ Correctly calls production API endpoints
 - ✅ Properly handles empty responses with fallbacks
 - ✅ Shows error messages when backend is unavailable
@@ -298,6 +320,7 @@ curl "https://mutualfun-backend.vercel.app/api/search/suggest?query=hdfc"
 - ✅ Displays static market data when live data unavailable
 
 **Frontend Changes Made**:
+
 1. Fixed production API URL (removed `/api` suffix)
 2. Changed market endpoint to `/api/market/summary`
 3. Added robust error handling for empty responses
@@ -309,22 +332,26 @@ curl "https://mutualfun-backend.vercel.app/api/search/suggest?query=hdfc"
 ## 🎯 EXPECTED RESULTS AFTER FIXES
 
 ### Database
+
 - ✅ 4,459 active funds in production
 - ✅ All categories properly populated
 - ✅ Proper indexes for fast queries
 
 ### Market Indices API
+
 - ✅ Returns live market data
 - ✅ Updates every 5 minutes (or appropriate interval)
 - ✅ Has fallback data if external API fails
 - ✅ Includes: Nifty 50, Sensex, Nifty Bank, etc.
 
 ### Pagination
+
 - ✅ Respects `limit` parameter up to 500
 - ✅ Efficient queries with proper pagination
 - ✅ Accurate `totalPages` calculation
 
 ### Performance
+
 - ✅ Response time < 200ms for fund list
 - ✅ Response time < 100ms for market data
 - ✅ Proper caching implemented
@@ -350,17 +377,20 @@ After fixing backend issues:
 ## 📝 NOTES
 
 **Current Data Breakdown** (150 funds):
+
 - Unknown category distribution
 - Likely incomplete across all fund houses
 - Missing most mutual funds from dataset
 
 **Impact Assessment**:
+
 - **Severity**: HIGH - 97% of data missing
 - **User Impact**: HIGH - Limited fund discovery
 - **SEO Impact**: HIGH - Missing content for search engines
 - **Business Impact**: HIGH - Incomplete product offering
 
 **Recommended Timeline**:
+
 1. **Immediate** (24h): Seed production database with all funds
 2. **High Priority** (48h): Fix market indices service
 3. **Medium Priority** (1 week): Optimize pagination and performance
