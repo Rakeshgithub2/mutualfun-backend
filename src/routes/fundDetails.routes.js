@@ -1,7 +1,7 @@
 /**
  * FUND DETAILS ROUTE - Complete Information
  * Returns sector allocation, top holdings, asset allocation, etc.
- * 
+ *
  * Endpoint: GET /api/funds/:fundId/details
  */
 
@@ -22,29 +22,33 @@ const fundSchema = new mongoose.Schema({
   riskMetrics: Object,
   aum: Number,
   expenseRatio: Number,
-  holdings: [{
-    companyName: String,
-    sector: String,
-    percentage: Number,
-    quantity: Number,
-    value: Number
-  }],
-  sectorAllocation: [{
-    sector: String,
-    percentage: Number,
-    amount: Number
-  }],
+  holdings: [
+    {
+      companyName: String,
+      sector: String,
+      percentage: Number,
+      quantity: Number,
+      value: Number,
+    },
+  ],
+  sectorAllocation: [
+    {
+      sector: String,
+      percentage: Number,
+      amount: Number,
+    },
+  ],
   assetAllocation: {
     equity: Number,
     debt: Number,
     cash: Number,
-    others: Number
+    others: Number,
   },
   fundManager: {
     name: String,
     experience: Number,
-    qualification: String
-  }
+    qualification: String,
+  },
 });
 
 const Fund = mongoose.model('Fund', fundSchema);
@@ -62,7 +66,7 @@ router.get('/:fundId/details', async (req, res) => {
     if (!fund) {
       return res.status(404).json({
         success: false,
-        message: 'Fund not found'
+        message: 'Fund not found',
       });
     }
 
@@ -90,48 +94,47 @@ router.get('/:fundId/details', async (req, res) => {
         subCategory: fund.subCategory,
         fundHouse: fund.fundHouse,
         fundType: fund.fundType,
-        
+
         // NAV and Performance
         currentNav: fund.currentNav,
         previousNav: fund.previousNav,
         navDate: fund.navDate,
         returns: fund.returns,
         riskMetrics: fund.riskMetrics,
-        
+
         // Fund Size
         aum: fund.aum,
         expenseRatio: fund.expenseRatio,
         exitLoad: fund.exitLoad,
         minInvestment: fund.minInvestment,
         sipMinAmount: fund.sipMinAmount,
-        
+
         // TOP HOLDINGS (Top 10 companies)
         topHoldings: fund.holdings.slice(0, 10),
         totalHoldings: fund.holdings.length,
-        
+
         // SECTOR ALLOCATION
         sectorAllocation: fund.sectorAllocation,
-        
+
         // ASSET ALLOCATION
         assetAllocation: fund.assetAllocation,
-        
+
         // Fund Manager
         fundManager: fund.fundManager,
-        
+
         // Ratings
         ratings: fund.ratings,
-        
+
         // Additional Info
         tags: fund.tags,
-        documents: fund.documents
-      }
+        documents: fund.documents,
+      },
     });
-
   } catch (error) {
     console.error('Error fetching fund details:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Internal server error',
     });
   }
 });
@@ -141,7 +144,7 @@ router.get('/:fundId/details', async (req, res) => {
  */
 function generateSampleHoldings(category, subCategory) {
   const holdings = [];
-  
+
   if (category === 'equity') {
     const companies = [
       { name: 'Reliance Industries', sector: 'Energy' },
@@ -158,22 +161,21 @@ function generateSampleHoldings(category, subCategory) {
       { name: 'Larsen & Toubro', sector: 'Capital Goods' },
       { name: 'Asian Paints', sector: 'Consumer Durables' },
       { name: 'Bajaj Finance', sector: 'Financial Services' },
-      { name: 'Maruti Suzuki', sector: 'Automobile' }
+      { name: 'Maruti Suzuki', sector: 'Automobile' },
     ];
 
     let remainingPercentage = 100;
     companies.forEach((company, index) => {
-      const percentage = index === 0 ? 8.5 : 
-                        index < 5 ? 6.2 : 
-                        index < 10 ? 4.5 : 2.8;
-      
+      const percentage =
+        index === 0 ? 8.5 : index < 5 ? 6.2 : index < 10 ? 4.5 : 2.8;
+
       if (remainingPercentage > 0) {
         holdings.push({
           companyName: company.name,
           sector: company.sector,
           percentage: Math.min(percentage, remainingPercentage),
           quantity: Math.floor(Math.random() * 100000),
-          value: Math.random() * 1000000
+          value: Math.random() * 1000000,
         });
         remainingPercentage -= percentage;
       }
@@ -197,14 +199,14 @@ function generateSectorAllocation(category) {
       { sector: 'Healthcare', percentage: 7.5 },
       { sector: 'Capital Goods', percentage: 6.2 },
       { sector: 'Telecom', percentage: 4.8 },
-      { sector: 'Metals & Mining', percentage: 3.4 }
+      { sector: 'Metals & Mining', percentage: 3.4 },
     ];
   } else if (category === 'debt') {
     return [
       { sector: 'Government Securities', percentage: 45.0 },
       { sector: 'Corporate Bonds - AAA', percentage: 30.0 },
       { sector: 'Corporate Bonds - AA', percentage: 15.0 },
-      { sector: 'Money Market Instruments', percentage: 10.0 }
+      { sector: 'Money Market Instruments', percentage: 10.0 },
     ];
   } else if (category === 'hybrid') {
     return [
@@ -212,7 +214,7 @@ function generateSectorAllocation(category) {
       { sector: 'Equity - IT', percentage: 15.0 },
       { sector: 'Corporate Bonds', percentage: 35.0 },
       { sector: 'Government Securities', percentage: 25.0 },
-      { sector: 'Cash & Equivalents', percentage: 5.0 }
+      { sector: 'Cash & Equivalents', percentage: 5.0 },
     ];
   }
 
@@ -228,21 +230,21 @@ function generateAssetAllocation(category) {
       equity: 95.5,
       debt: 2.5,
       cash: 2.0,
-      others: 0.0
+      others: 0.0,
     };
   } else if (category === 'debt') {
     return {
       equity: 0.0,
       debt: 97.0,
       cash: 3.0,
-      others: 0.0
+      others: 0.0,
     };
   } else if (category === 'hybrid') {
     return {
       equity: 65.0,
       debt: 30.0,
       cash: 4.0,
-      others: 1.0
+      others: 1.0,
     };
   }
 
@@ -250,7 +252,7 @@ function generateAssetAllocation(category) {
     equity: 0,
     debt: 0,
     cash: 100,
-    others: 0
+    others: 0,
   };
 }
 

@@ -1,7 +1,7 @@
 /**
  * PRODUCTION DATABASE SEEDER
  * Seeds production database with all 4,459 funds including complete details
- * 
+ *
  * Usage: NODE_ENV=production node scripts/seed-production-complete.js
  */
 
@@ -27,7 +27,7 @@ const fundSchema = new mongoose.Schema({
     oneYear: Number,
     threeYear: Number,
     fiveYear: Number,
-    sinceInception: Number
+    sinceInception: Number,
   },
   riskMetrics: {
     sharpeRatio: Number,
@@ -35,7 +35,7 @@ const fundSchema = new mongoose.Schema({
     beta: Number,
     alpha: Number,
     rSquared: Number,
-    sortino: Number
+    sortino: Number,
   },
   aum: Number,
   expenseRatio: Number,
@@ -45,43 +45,47 @@ const fundSchema = new mongoose.Schema({
   ratings: {
     morningstar: Number,
     crisil: Number,
-    valueResearch: Number
+    valueResearch: Number,
   },
   // IMPORTANT: Detailed fund information
-  holdings: [{
-    companyName: String,
-    sector: String,
-    percentage: Number,
-    quantity: Number,
-    value: Number
-  }],
-  sectorAllocation: [{
-    sector: String,
-    percentage: Number,
-    amount: Number
-  }],
+  holdings: [
+    {
+      companyName: String,
+      sector: String,
+      percentage: Number,
+      quantity: Number,
+      value: Number,
+    },
+  ],
+  sectorAllocation: [
+    {
+      sector: String,
+      percentage: Number,
+      amount: Number,
+    },
+  ],
   assetAllocation: {
     equity: Number,
     debt: Number,
     cash: Number,
-    others: Number
+    others: Number,
   },
   fundManager: {
     name: String,
     experience: Number,
     qualification: String,
-    since: Date
+    since: Date,
   },
   documents: {
     schemeDocument: String,
     factSheet: String,
-    annualReport: String
+    annualReport: String,
   },
   tags: [String],
   popularity: Number,
   isActive: Boolean,
   createdAt: Date,
-  updatedAt: Date
+  updatedAt: Date,
 });
 
 const Fund = mongoose.model('Fund', fundSchema);
@@ -89,12 +93,15 @@ const Fund = mongoose.model('Fund', fundSchema);
 async function seedProductionDatabase() {
   try {
     console.log('🚀 Starting production database seeding...\n');
-    
+
     // Use production MongoDB URI
-    const PRODUCTION_URI = process.env.MONGODB_URI_PRODUCTION || process.env.MONGODB_URI;
-    
+    const PRODUCTION_URI =
+      process.env.MONGODB_URI_PRODUCTION || process.env.MONGODB_URI;
+
     if (!PRODUCTION_URI) {
-      throw new Error('❌ MONGODB_URI_PRODUCTION not set in environment variables!');
+      throw new Error(
+        '❌ MONGODB_URI_PRODUCTION not set in environment variables!'
+      );
     }
 
     console.log('📡 Connecting to production database...');
@@ -104,14 +111,18 @@ async function seedProductionDatabase() {
     // First, get all funds from local database
     console.log('📥 Fetching funds from local database...');
     const LOCAL_URI = 'mongodb://localhost:27017/mutual-funds';
-    const localConnection = await mongoose.createConnection(LOCAL_URI).asPromise();
+    const localConnection = await mongoose
+      .createConnection(LOCAL_URI)
+      .asPromise();
     const LocalFund = localConnection.model('Fund', fundSchema);
-    
+
     const allFunds = await LocalFund.find({ isActive: true }).lean();
     console.log(`✅ Found ${allFunds.length} active funds in local database\n`);
 
     if (allFunds.length === 0) {
-      throw new Error('❌ No funds found in local database! Run local seeder first.');
+      throw new Error(
+        '❌ No funds found in local database! Run local seeder first.'
+      );
     }
 
     // Clear existing production data (optional - comment out to keep existing)
@@ -128,35 +139,42 @@ async function seedProductionDatabase() {
       const batch = allFunds.slice(i, i + BATCH_SIZE);
       await Fund.insertMany(batch, { ordered: false });
       inserted += batch.length;
-      
+
       const progress = ((inserted / allFunds.length) * 100).toFixed(1);
-      process.stdout.write(`Progress: ${inserted}/${allFunds.length} (${progress}%) \r`);
+      process.stdout.write(
+        `Progress: ${inserted}/${allFunds.length} (${progress}%) \r`
+      );
     }
 
-    console.log(`\n\n✅ Successfully inserted ${inserted} funds into production!`);
+    console.log(
+      `\n\n✅ Successfully inserted ${inserted} funds into production!`
+    );
 
     // Verify the insertion
     const prodCount = await Fund.countDocuments({ isActive: true });
-    console.log(`\n🔍 Verification: ${prodCount} active funds in production database`);
+    console.log(
+      `\n🔍 Verification: ${prodCount} active funds in production database`
+    );
 
     // Show category breakdown
     console.log('\n📊 Category Breakdown:');
     const categories = await Fund.aggregate([
       { $match: { isActive: true } },
       { $group: { _id: '$category', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
+      { $sort: { count: -1 } },
     ]);
-    
-    categories.forEach(cat => {
+
+    categories.forEach((cat) => {
       console.log(`   ${cat._id}: ${cat.count} funds`);
     });
 
     await localConnection.close();
     await mongoose.connection.close();
-    
+
     console.log('\n✅ Production database seeding completed successfully!');
-    console.log('\n🎉 Your backend now has 4,459+ funds with complete details!\n');
-    
+    console.log(
+      '\n🎉 Your backend now has 4,459+ funds with complete details!\n'
+    );
   } catch (error) {
     console.error('\n❌ Error seeding production database:', error);
     process.exit(1);
