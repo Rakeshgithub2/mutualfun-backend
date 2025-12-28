@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon src/app.js",
     "dev:simple": "tsx src/server-simple.ts",
-    "dev:direct": "tsx src/index.ts",
+    "dev:direct": "tsx watch src/index.ts",
     "dev:old": "tsx watch src/index.ts",
     "dev:local": "dotenv -e .env.local -- tsx watch src/index.ts",
     "postinstall": "prisma generate",

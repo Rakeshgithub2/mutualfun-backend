@@ -5,13 +5,31 @@
 
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend with graceful fallback if API key is missing
+let resend;
+try {
+  if (process.env.RESEND_API_KEY) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  } else {
+    console.warn('⚠️  RESEND_API_KEY not set - Email service will not work');
+    resend = null;
+  }
+} catch (error) {
+  console.error('❌ Failed to initialize Resend:', error.message);
+  resend = null;
+}
 
 class EmailService {
   /**
    * Send OTP email for password reset
    */
   static async sendPasswordResetOTP(email, otp, userName) {
+    if (!resend) {
+      console.warn(
+        '⚠️  Email service not available - RESEND_API_KEY not configured'
+      );
+      return { success: false, error: 'Email service not configured' };
+    }
     try {
       const { data, error } = await resend.emails.send({
         from: process.env.FROM_EMAIL || 'onboarding@resend.dev',

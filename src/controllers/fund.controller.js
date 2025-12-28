@@ -501,6 +501,246 @@ class FundController {
       });
     }
   }
+
+  /**
+   * 🔥 SMART SEARCH - Search with fallback to external API
+   * GET /api/funds/smart-search?q=hdfc&schemeCode=119551
+   *
+   * Flow:
+   * 1. Search in local MongoDB database
+   * 2. If not found, fetch from MFAPI.in in real-time
+   * 3. Save fetched fund to MongoDB for future
+   * 4. Return fund data with source indicator
+   */
+  static async smartSearch(req, res) {
+    try {
+      const { q: searchQuery, schemeCode } = req.query;
+
+      // Validate input
+      if (!searchQuery && !schemeCode) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing search parameter',
+          message: 'Provide either "q" (search query) or "schemeCode"',
+        });
+      }
+
+      // Step 1: Search in local database
+      console.log(
+        `🔍 Smart search initiated: query="${searchQuery}", code="${schemeCode}"`
+      );
+
+      let fund = null;
+
+      if (schemeCode) {
+        // Direct scheme code search
+        fund = await Fund.findOne({
+          schemeCode: schemeCode.toString(),
+          status: 'Active',
+        }).lean();
+
+        if (fund) {
+          console.log(`✅ Found in database: ${fund.schemeName}`);
+          return res.json({
+            success: true,
+            source: 'database',
+            cached: true,
+            data: fund,
+          });
+        }
+
+        console.log(`❌ Scheme code ${schemeCode} not found in database`);
+
+        // Step 2: Fetch from external API (MFAPI)
+        const mfapiService = require('../services/mfapi.service');
+
+        try {
+          console.log(`🌐 Fetching from MFAPI: ${schemeCode}`);
+          const apiFund = await mfapiService.fetchFundBySchemeCode(schemeCode);
+
+          if (!apiFund) {
+            return res.status(404).json({
+              success: false,
+              error: 'Fund not found',
+              message: `No fund found with scheme code: ${schemeCode}`,
+              searchedIn: ['database', 'mfapi'],
+            });
+          }
+
+          // Step 3: Save to MongoDB
+          console.log(`💾 Saving new fund to database: ${apiFund.schemeName}`);
+          fund = await Fund.create(apiFund);
+
+          // Invalidate relevant caches
+          await cacheClient.del('funds:list:*');
+
+          console.log(
+            `✅ Fund saved and returned from API: ${fund.schemeName}`
+          );
+
+          return res.json({
+            success: true,
+            source: 'live-api',
+            cached: false,
+            provider: 'MFAPI',
+            data: fund,
+            message: 'Fund fetched from external API and saved to database',
+          });
+        } catch (apiError) {
+          console.error('MFAPI fetch failed:', apiError.message);
+
+          return res.status(503).json({
+            success: false,
+            error: 'External API unavailable',
+            message: 'Could not fetch fund from external source',
+            details: apiError.message,
+          });
+        }
+      } else if (searchQuery) {
+        // Text search in database
+        const funds = await Fund.find(
+          {
+            $text: { $search: searchQuery },
+            status: 'Active',
+          },
+          { score: { $meta: 'textScore' } }
+        )
+          .sort({ score: { $meta: 'textScore' } })
+          .limit(10)
+          .lean();
+
+        if (funds.length > 0) {
+          console.log(
+            `✅ Found ${funds.length} funds matching "${searchQuery}"`
+          );
+          return res.json({
+            success: true,
+            source: 'database',
+            cached: true,
+            query: searchQuery,
+            data: funds,
+            count: funds.length,
+          });
+        }
+
+        // No results in database, suggest using scheme code
+        return res.status(404).json({
+          success: false,
+          error: 'No funds found',
+          message: `No funds found matching "${searchQuery}". Try searching with a scheme code.`,
+          suggestion:
+            'Use ?schemeCode=119551 to fetch specific fund from external API',
+        });
+      }
+    } catch (error) {
+      console.error('Smart search error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Search failed',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * 🔄 BATCH IMPORT - Import multiple funds from external API
+   * POST /api/funds/batch-import
+   * Body: { schemeCodes: ["119551", "119552", "119553"] }
+   */
+  static async batchImport(req, res) {
+    try {
+      const { schemeCodes } = req.body;
+
+      if (!Array.isArray(schemeCodes) || schemeCodes.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid input',
+          message: 'Provide an array of scheme codes',
+        });
+      }
+
+      if (schemeCodes.length > 100) {
+        return res.status(400).json({
+          success: false,
+          error: 'Too many codes',
+          message: 'Maximum 100 scheme codes per request',
+        });
+      }
+
+      console.log(`📦 Batch import initiated for ${schemeCodes.length} funds`);
+
+      const mfapiService = require('../services/mfapi.service');
+      const results = {
+        total: schemeCodes.length,
+        successful: 0,
+        failed: 0,
+        skipped: 0,
+        funds: [],
+        errors: [],
+      };
+
+      for (const schemeCode of schemeCodes) {
+        try {
+          // Check if already exists
+          const existing = await Fund.findOne({ schemeCode });
+          if (existing) {
+            console.log(`⏭️  Skipping existing fund: ${schemeCode}`);
+            results.skipped++;
+            continue;
+          }
+
+          // Fetch from API
+          const apiFund = await mfapiService.fetchFundBySchemeCode(schemeCode);
+
+          if (!apiFund) {
+            results.failed++;
+            results.errors.push({
+              schemeCode,
+              error: 'Not found in MFAPI',
+            });
+            continue;
+          }
+
+          // Save to database
+          const savedFund = await Fund.create(apiFund);
+          results.successful++;
+          results.funds.push({
+            schemeCode: savedFund.schemeCode,
+            name: savedFund.schemeName,
+          });
+
+          console.log(`✅ Imported: ${savedFund.schemeName}`);
+        } catch (error) {
+          results.failed++;
+          results.errors.push({
+            schemeCode,
+            error: error.message,
+          });
+          console.error(`❌ Failed to import ${schemeCode}:`, error.message);
+        }
+      }
+
+      // Invalidate caches
+      await cacheClient.del('funds:list:*');
+
+      console.log(
+        `📦 Batch import complete: ${results.successful} successful, ${results.failed} failed, ${results.skipped} skipped`
+      );
+
+      res.json({
+        success: true,
+        message: 'Batch import completed',
+        results,
+      });
+    } catch (error) {
+      console.error('Batch import error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Batch import failed',
+        message: error.message,
+      });
+    }
+  }
 }
 
 module.exports = FundController;

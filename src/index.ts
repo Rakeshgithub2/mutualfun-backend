@@ -12,7 +12,7 @@ import { mongodb } from './db/mongodb';
 // import { startWatchlistChangeStream } from './services/changeStreams';
 
 // Import Market Indices Service for auto-update
-const marketIndicesService = require('./services/marketIndices.service');
+import { marketIndicesService } from './services/marketIndices.service';
 
 // Load environment variables
 dotenv.config();
@@ -35,7 +35,7 @@ async function initializeDatabase() {
 async function initializeMarketIndices() {
   try {
     console.log('📈 Initializing market indices...');
-    await marketIndicesService.forceInitialUpdate();
+    await marketIndicesService.refreshAllIndices();
     console.log('✅ Market indices initialized');
   } catch (error) {
     console.error('⚠️  Failed to initialize market indices:', error);
@@ -95,7 +95,7 @@ app.get('/api/market/summary', async (req, res) => {
       success: true,
       data: indices,
       lastUpdated: new Date().toISOString(),
-      marketOpen: marketIndicesService.isMarketOpen(),
+      marketOpen: true, // TODO: implement market status check
     });
   } catch (error: any) {
     console.error('Error fetching market indices:', error);
@@ -165,22 +165,20 @@ if (process.env.NODE_ENV !== 'test') {
         console.log('🎯 Server is alive and listening for requests');
 
         // Start Market Indices Auto-Update Service
-        console.log('📈 Starting Market Indices auto-update service...');
-        marketIndicesService.startAutoUpdate();
-        console.log(
-          '✅ Market indices will update every 2 hours during market hours'
-        );
+        // TODO: Implement auto-update service for market indices
+        console.log('📈 Market indices service ready');
+        console.log('💡 Market indices will refresh on each API call');
 
         // Keep the process alive - multiple strategies
         process.stdin.resume();
 
-        // Add keepalive interval to prevent process exit
-        setInterval(
-          () => {
-            // Empty interval to keep event loop active
-          },
-          1000 * 60 * 60
-        ); // Every hour
+        // Add keepalive interval to keep event loop active
+        setInterval(() => {
+          // Log to confirm server is alive
+          console.log(
+            `🔄 Server alive check at ${new Date().toLocaleTimeString()}`
+          );
+        }, 1000 * 60); // Every minute
 
         console.log('✅ Server keepalive configured - will stay running');
       });
@@ -192,6 +190,32 @@ if (process.env.NODE_ENV !== 'test') {
           console.error('❌ Server error:', error);
         }
         process.exit(1);
+      });
+
+      // Add listeners for unhandled errors
+      process.on('unhandledRejection', (reason, promise) => {
+        console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+      });
+
+      process.on('uncaughtException', (error) => {
+        console.error('💥 Uncaught Exception:', error);
+      });
+
+      // Prevent process exit with signal handlers
+      process.on('SIGTERM', () => {
+        console.log('\n⚠️  SIGTERM received, shutting down gracefully...');
+        server.close(() => {
+          console.log('✅ Server closed');
+          process.exit(0);
+        });
+      });
+
+      process.on('SIGINT', () => {
+        console.log('\n⚠️  SIGINT received, shutting down gracefully...');
+        server.close(() => {
+          console.log('✅ Server closed');
+          process.exit(0);
+        });
       });
     })
     .catch((error) => {

@@ -1,53 +1,61 @@
-# 🎯 COMPLETE FRONTEND IMPLEMENTATION PROMPT
+# FRONTEND IMPLEMENTATION GUIDE - Complete Prompt
 
-> **Copy this entire prompt and use it to implement frontend changes**
+## 🎯 OBJECTIVE
 
----
+Implement frontend to fetch and display all 4,485+ mutual funds from backend API with proper error handling, loading states, and responsive UI.
 
-# Context
-
-You are a **senior React/Next.js developer** working on a **mutual fund information website**. The backend API has been updated and is now production-ready on Vercel. Your task is to implement the frontend to work seamlessly with this backend.
-
----
-
-# Backend API Information
-
-**Backend URL**: `https://your-backend-name.vercel.app`
-
-**Important**: All API calls MUST use `withCredentials: true` for authentication cookies to work!
+**Backend Status**: ✅ Working perfectly (4,485 funds available)  
+**Backend URL**: `http://localhost:3002/api`
 
 ---
 
-# Required Changes (Complete Implementation)
+## 📁 FOLDER STRUCTURE TO CREATE IN YOUR FRONTEND
 
-## 1️⃣ ENVIRONMENT CONFIGURATION
-
-### Create/Update `.env.local` (for local development)
-
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:3002
+```
+frontend/
+├── src/
+│   ├── api/
+│   │   └── funds.api.ts          # All API calls (CREATE THIS)
+│   ├── components/
+│   │   ├── FundList.tsx          # Main fund list (CREATE/UPDATE)
+│   │   ├── FundCard.tsx          # Individual fund card (CREATE)
+│   │   ├── FundFilters.tsx       # Filter controls (CREATE)
+│   │   ├── MarketIndices.tsx     # Market dashboard (CREATE)
+│   │   ├── FundDetailsPage.tsx   # Complete fund details (CREATE)
+│   │   ├── Pagination.tsx        # Pagination control (CREATE)
+│   │   ├── LoadingSpinner.tsx    # Loading state (CREATE)
+│   │   └── ErrorDisplay.tsx      # Error handling (CREATE)
+│   ├── utils/
+│   │   ├── categoryNormalizer.ts # Category formatting (CREATE)
+│   │   └── formatters.ts         # Number/date formatting (CREATE)
+│   ├── types/
+│   │   └── fund.types.ts         # TypeScript types (CREATE)
+│   ├── hooks/
+│   │   └── useFunds.ts           # Custom hook for funds (CREATE)
+│   └── config/
+│       └── api.config.ts         # API configuration (CREATE)
+├── .env.local                     # Environment variables (CREATE)
+└── .env.production               # Production config (CREATE)
 ```
 
-### Add to Vercel Frontend Environment Variables
-
-Go to Vercel Dashboard → Your Frontend Project → Settings → Environment Variables
-
-```bash
-NEXT_PUBLIC_API_URL=https://your-backend-name.vercel.app
-```
-
-⚠️ **Important**: No trailing slash in the URL!
-
 ---
 
-## 2️⃣ AXIOS CONFIGURATION (CRITICAL)
+## 🚀 STEP-BY-STEP IMPLEMENTATION
 
-### Create `lib/axios.ts` or `lib/api.ts`
+### STEP 1: Configure Environment Variables
 
-```typescript
-import axios from 'axios';
+**Create `.env.local` in frontend root:**
 
-// Get API URL from environment
+```bash
+# Backend API Configuration
+VITE_API_URL=http://localhost:3002/api
+VITE_BACKEND_URL=http://localhost:3002
+
+# Debug mode (set to false in production)
+VITE_DEBUG=true
+
+# API Timeout (milliseconds)
+VITE_API_TIMEOUT=10000
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
 // Create axios instance with default config

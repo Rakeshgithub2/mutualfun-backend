@@ -13,6 +13,13 @@ router.get('/', rateLimiter.apiLimiter, FundController.getAllFunds);
 
 router.get('/search', rateLimiter.searchLimiter, FundController.searchFunds);
 
+// 🔥 NEW: Smart search with external API fallback
+router.get(
+  '/smart-search',
+  rateLimiter.searchLimiter,
+  FundController.smartSearch
+);
+
 router.get('/categories', rateLimiter.apiLimiter, FundController.getCategories);
 
 router.get(
@@ -49,6 +56,13 @@ router.get(
   '/:schemeCode/holdings',
   rateLimiter.apiLimiter,
   FundController.getFundHoldings
+);
+
+// 🔥 NEW: Batch import from external API (protected if you want)
+router.post(
+  '/batch-import',
+  rateLimiter.apiLimiter,
+  FundController.batchImport
 );
 
 module.exports = router;

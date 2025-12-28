@@ -225,17 +225,25 @@ export class MarketIndicesService {
       const indexData = data.data?.find((idx: any) => idx.index === targetName);
       if (!indexData) return null;
 
+      // Safely parse numeric values with fallbacks
+      const last = parseFloat(indexData.last) || 0;
+      const previousClose = parseFloat(indexData.previousClose) || last;
+      const change = parseFloat(indexData.change) || last - previousClose;
+      const perChange =
+        parseFloat(indexData.perChange) ||
+        (previousClose > 0 ? (change / previousClose) * 100 : 0);
+
       return {
         indexId,
         name: indexData.index,
         symbol: targetName.replace(/ /g, '_'),
-        currentValue: parseFloat(indexData.last),
-        previousClose: parseFloat(indexData.previousClose),
-        change: parseFloat(indexData.change),
-        changePercent: parseFloat(indexData.perChange),
-        open: parseFloat(indexData.open),
-        high: parseFloat(indexData.high),
-        low: parseFloat(indexData.low),
+        currentValue: last,
+        previousClose,
+        change,
+        changePercent: perChange,
+        open: parseFloat(indexData.open) || previousClose,
+        high: parseFloat(indexData.high) || last,
+        low: parseFloat(indexData.low) || last,
         marketStatus: this.getMarketStatus(),
         lastUpdated: new Date(),
         tradingDay: new Date(),
@@ -318,20 +326,25 @@ export class MarketIndicesService {
       const quote = data.indicators.quote[0];
       const meta = data.meta;
 
+      // Safely parse numeric values
+      const regularMarketPrice = parseFloat(meta.regularMarketPrice) || 0;
+      const chartPreviousClose =
+        parseFloat(meta.chartPreviousClose) || regularMarketPrice;
+      const change = regularMarketPrice - chartPreviousClose;
+      const changePercent =
+        chartPreviousClose > 0 ? (change / chartPreviousClose) * 100 : 0;
+
       return {
         indexId,
         name: indexInfo.name,
         symbol: indexInfo.symbol,
-        currentValue: meta.regularMarketPrice,
-        previousClose: meta.chartPreviousClose,
-        change: meta.regularMarketPrice - meta.chartPreviousClose,
-        changePercent:
-          ((meta.regularMarketPrice - meta.chartPreviousClose) /
-            meta.chartPreviousClose) *
-          100,
-        open: quote.open[0],
-        high: quote.high[0],
-        low: quote.low[0],
+        currentValue: regularMarketPrice,
+        previousClose: chartPreviousClose,
+        change,
+        changePercent,
+        open: parseFloat(quote.open?.[0]) || chartPreviousClose,
+        high: parseFloat(quote.high?.[0]) || regularMarketPrice,
+        low: parseFloat(quote.low?.[0]) || regularMarketPrice,
         marketStatus: this.getMarketStatus(),
         lastUpdated: new Date(meta.regularMarketTime * 1000),
         tradingDay: new Date(),
@@ -351,7 +364,13 @@ export class MarketIndicesService {
    * Perform sanity check on index data
    */
   private performSanityCheck(indexData: Partial<MarketIndex>): boolean {
-    if (!indexData.indexId || !indexData.changePercent) {
+    if (!indexData.indexId || indexData.changePercent === undefined) {
+      return false;
+    }
+
+    // Check for NaN values
+    if (isNaN(indexData.changePercent) || !isFinite(indexData.changePercent)) {
+      console.log(`Sanity check failed for ${indexData.indexId}: NaN% change`);
       return false;
     }
 
@@ -361,10 +380,17 @@ export class MarketIndicesService {
     }
 
     // Check if change % is within acceptable range
-    return (
+    const isValid =
       indexData.changePercent >= range.min &&
-      indexData.changePercent <= range.max
-    );
+      indexData.changePercent <= range.max;
+
+    if (!isValid) {
+      console.log(
+        `Sanity check failed for ${indexData.indexId}: ${indexData.changePercent.toFixed(2)}% outside range ${range.min}% to ${range.max}%`
+      );
+    }
+
+    return isValid;
   }
 
   /**

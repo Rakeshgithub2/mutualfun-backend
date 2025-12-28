@@ -446,8 +446,12 @@ class MarketIndicesService {
   }
 }
 
+// Create singleton instance
+const serviceInstance = new MarketIndicesService();
+
 // Export for use in routes
-module.exports = new MarketIndicesService();
+module.exports = serviceInstance;
+module.exports.default = serviceInstance;
 
 // If run directly, start the service
 if (require.main === module) {
