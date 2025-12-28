@@ -10,7 +10,7 @@ class PaginationUtil {
   static DEFAULTS = {
     PAGE: 1,
     LIMIT: 20,
-    MAX_LIMIT: 100,
+    MAX_LIMIT: 500, // Increased from 100 to 500 for better performance
   };
 
   /**
