@@ -450,7 +450,7 @@ export class SectorAllocationService {
     const fundsWithSectors = await fundsCollection.countDocuments({
       category: 'equity',
       isActive: true,
-      sectorAllocation: { $exists: true, $ne: [], $ne: null },
+      sectorAllocation: { $exists: true, $not: { $in: [[], null] } },
     });
 
     const fundsWithoutSectors = totalEquityFunds - fundsWithSectors;
