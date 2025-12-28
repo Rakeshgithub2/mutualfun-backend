@@ -8,6 +8,11 @@ import {
   searchFunds,
   getFundManagerByFundId,
 } from '../controllers/funds.search.controller';
+import {
+  getFundDetails,
+  getFundSectors,
+  getFundHoldings,
+} from '../controllers/fundDetails.controller';
 
 const router = Router();
 
@@ -25,6 +30,16 @@ router.get('/:fundId/manager', getFundManagerByFundId);
 // GET /funds/:fundId/price-history - Get historical NAV/price data
 // MUST be before /:id route
 router.get('/:fundId/price-history', getFundNavs);
+
+// GET /funds/:fundId/details - Get complete fund details with sectors, holdings, etc.
+// MUST be before /:id route
+router.get('/:fundId/details', getFundDetails);
+
+// GET /funds/:fundId/sectors - Get sector allocation only
+router.get('/:fundId/sectors', getFundSectors);
+
+// GET /funds/:fundId/holdings - Get top holdings only
+router.get('/:fundId/holdings', getFundHoldings);
 
 // GET /funds/:id - Get complete fund details
 // This MUST be last among parameterized routes

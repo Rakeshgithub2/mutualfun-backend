@@ -11,6 +11,9 @@ import { mongodb } from './db/mongodb';
 // import { initializeSocket } from './services/socket';
 // import { startWatchlistChangeStream } from './services/changeStreams';
 
+// Import Market Indices Service for auto-update
+const marketIndicesService = require('./services/marketIndices.service');
+
 // Load environment variables
 dotenv.config();
 
@@ -59,6 +62,7 @@ app.get('/health', (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    version: '2.0.0', // Complete fund details with holdings and sectors
   });
 });
 
@@ -70,6 +74,25 @@ app.get('/api/test', (req, res) => {
 
 // API routes
 app.use('/api', routes);
+
+// Market Indices endpoint (live auto-updating data)
+app.get('/api/market/summary', async (req, res) => {
+  try {
+    const indices = await marketIndicesService.getAllIndices();
+    res.json({
+      success: true,
+      data: indices,
+      lastUpdated: new Date().toISOString(),
+      marketOpen: marketIndicesService.isMarketOpen(),
+    });
+  } catch (error: any) {
+    console.error('Error fetching market indices:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch market indices',
+    });
+  }
+});
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -125,6 +148,11 @@ if (process.env.NODE_ENV !== 'test') {
           `📡 WebSocket ready for real-time updates (after npm install)`
         );
         console.log('🎯 Server is alive and listening for requests');
+
+        // Start Market Indices Auto-Update Service
+        console.log('📈 Starting Market Indices auto-update service...');
+        marketIndicesService.startAutoUpdate();
+        console.log('✅ Market indices will update every 2 hours during market hours');
 
         // Keep the process alive - multiple strategies
         process.stdin.resume();
