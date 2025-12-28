@@ -10,7 +10,7 @@
  */
 
 import { Request, Response } from 'express';
-import Fund from '../models/Fund.model';
+const Fund = require('../models/Fund.model');
 
 /**
  * GET /api/funds/:fundId/details
