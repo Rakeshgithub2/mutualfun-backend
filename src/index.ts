@@ -152,7 +152,9 @@ if (process.env.NODE_ENV !== 'test') {
         // Start Market Indices Auto-Update Service
         console.log('📈 Starting Market Indices auto-update service...');
         marketIndicesService.startAutoUpdate();
-        console.log('✅ Market indices will update every 2 hours during market hours');
+        console.log(
+          '✅ Market indices will update every 2 hours during market hours'
+        );
 
         // Keep the process alive - multiple strategies
         process.stdin.resume();
