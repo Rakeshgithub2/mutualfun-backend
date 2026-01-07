@@ -9,7 +9,7 @@ class PaginationUtil {
    */
   static DEFAULTS = {
     PAGE: 1,
-    LIMIT: 500, // Increased from 20 to 500 for better data display
+    LIMIT: 2500, // Increased to 2500 to match frontend expectations
     MAX_LIMIT: 15000, // Increased to support fetching all funds at once
   };
 

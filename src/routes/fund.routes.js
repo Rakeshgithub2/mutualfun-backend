@@ -12,7 +12,11 @@ const rateLimiter = require('../middleware/rateLimiter.middleware');
 router.get('/', rateLimiter.apiLimiter, FundController.getAllFunds);
 
 // 🆕 Get ALL funds without pagination (for category pages)
-router.get('/all', rateLimiter.apiLimiter, FundController.getAllFundsNoPagination);
+router.get(
+  '/all',
+  rateLimiter.apiLimiter,
+  FundController.getAllFundsNoPagination
+);
 
 router.get('/search', rateLimiter.searchLimiter, FundController.searchFunds);
 

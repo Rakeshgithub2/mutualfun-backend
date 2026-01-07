@@ -11,7 +11,8 @@ require('dotenv').config();
 // Models
 const Fund = require('./src/models/Fund.model');
 
-const AMFI_NAV_URL = process.env.AMFI_NAV_URL || 'https://www.amfiindia.com/spages/NAVAll.txt';
+const AMFI_NAV_URL =
+  process.env.AMFI_NAV_URL || 'https://www.amfiindia.com/spages/NAVAll.txt';
 
 /**
  * Detect fund category from name
@@ -19,15 +20,33 @@ const AMFI_NAV_URL = process.env.AMFI_NAV_URL || 'https://www.amfiindia.com/spag
 function detectCategory(name) {
   const nameLower = name.toLowerCase();
 
-  if (nameLower.includes('equity') || nameLower.includes('elss')) return 'Equity';
-  if (nameLower.includes('debt') || nameLower.includes('bond') || nameLower.includes('income')) return 'Debt';
-  if (nameLower.includes('hybrid') || nameLower.includes('balanced')) return 'Hybrid';
-  if (nameLower.includes('gold') || nameLower.includes('silver') || nameLower.includes('commodity')) return 'Commodity';
-  if (nameLower.includes('etf') || nameLower.includes('index')) return 'Index';
-  if (nameLower.includes('liquid') || nameLower.includes('ultra short') || nameLower.includes('money market')) return 'Debt';
-  if (nameLower.includes('fof') || nameLower.includes('fund of funds')) return 'Other';
+  if (nameLower.includes('equity') || nameLower.includes('elss'))
+    return 'equity';
+  if (
+    nameLower.includes('debt') ||
+    nameLower.includes('bond') ||
+    nameLower.includes('income')
+  )
+    return 'debt';
+  if (nameLower.includes('hybrid') || nameLower.includes('balanced'))
+    return 'hybrid';
+  if (
+    nameLower.includes('gold') ||
+    nameLower.includes('silver') ||
+    nameLower.includes('commodity')
+  )
+    return 'commodity';
+  if (nameLower.includes('etf') || nameLower.includes('index')) return 'equity';
+  if (
+    nameLower.includes('liquid') ||
+    nameLower.includes('ultra short') ||
+    nameLower.includes('money market')
+  )
+    return 'debt';
+  if (nameLower.includes('fof') || nameLower.includes('fund of funds'))
+    return 'other';
 
-  return 'Other';
+  return 'other';
 }
 
 /**
@@ -37,27 +56,56 @@ function detectSubcategory(name) {
   const nameLower = name.toLowerCase();
 
   // Equity subcategories
-  if (nameLower.includes('large cap') || nameLower.includes('bluechip') || nameLower.includes('blue chip')) return 'Large Cap';
+  if (
+    nameLower.includes('large cap') ||
+    nameLower.includes('bluechip') ||
+    nameLower.includes('blue chip')
+  )
+    return 'Large Cap';
   if (nameLower.includes('mid cap')) return 'Mid Cap';
   if (nameLower.includes('small cap')) return 'Small Cap';
-  if (nameLower.includes('flexi cap') || nameLower.includes('multi cap') || nameLower.includes('multicap')) return 'Flexi Cap';
-  if (nameLower.includes('elss') || nameLower.includes('tax saver') || nameLower.includes('tax saving')) return 'ELSS';
-  if (nameLower.includes('focused') || nameLower.includes('focus')) return 'Focused';
+  if (
+    nameLower.includes('flexi cap') ||
+    nameLower.includes('multi cap') ||
+    nameLower.includes('multicap')
+  )
+    return 'Flexi Cap';
+  if (
+    nameLower.includes('elss') ||
+    nameLower.includes('tax saver') ||
+    nameLower.includes('tax saving')
+  )
+    return 'ELSS';
+  if (nameLower.includes('focused') || nameLower.includes('focus'))
+    return 'Focused';
   if (nameLower.includes('dividend yield')) return 'Dividend Yield';
   if (nameLower.includes('value')) return 'Value';
   if (nameLower.includes('contra')) return 'Contra';
-  
+
   // Sectoral/Thematic
-  if (nameLower.includes('sectoral') || nameLower.includes('sector') ||
-      nameLower.includes('pharma') || nameLower.includes('healthcare') ||
-      nameLower.includes('banking') || nameLower.includes('financial') ||
-      nameLower.includes('technology') || nameLower.includes('it') ||
-      nameLower.includes('infrastructure') || nameLower.includes('infra') ||
-      nameLower.includes('energy') || nameLower.includes('power') ||
-      nameLower.includes('fmcg') || nameLower.includes('consumer') ||
-      nameLower.includes('auto') || nameLower.includes('manufacturing') ||
-      nameLower.includes('metal') || nameLower.includes('realty') ||
-      nameLower.includes('media') || nameLower.includes('services')) return 'Sectoral';
+  if (
+    nameLower.includes('sectoral') ||
+    nameLower.includes('sector') ||
+    nameLower.includes('pharma') ||
+    nameLower.includes('healthcare') ||
+    nameLower.includes('banking') ||
+    nameLower.includes('financial') ||
+    nameLower.includes('technology') ||
+    nameLower.includes('it') ||
+    nameLower.includes('infrastructure') ||
+    nameLower.includes('infra') ||
+    nameLower.includes('energy') ||
+    nameLower.includes('power') ||
+    nameLower.includes('fmcg') ||
+    nameLower.includes('consumer') ||
+    nameLower.includes('auto') ||
+    nameLower.includes('manufacturing') ||
+    nameLower.includes('metal') ||
+    nameLower.includes('realty') ||
+    nameLower.includes('media') ||
+    nameLower.includes('services')
+  )
+    return 'Sectoral';
 
   // Debt subcategories
   if (nameLower.includes('liquid')) return 'Liquid';
@@ -65,22 +113,41 @@ function detectSubcategory(name) {
   if (nameLower.includes('ultra short')) return 'Ultra Short Duration';
   if (nameLower.includes('low duration')) return 'Low Duration';
   if (nameLower.includes('money market')) return 'Money Market';
-  if (nameLower.includes('short duration') || nameLower.includes('short term')) return 'Short Duration';
-  if (nameLower.includes('medium duration') || nameLower.includes('medium term')) return 'Medium Duration';
+  if (nameLower.includes('short duration') || nameLower.includes('short term'))
+    return 'Short Duration';
+  if (
+    nameLower.includes('medium duration') ||
+    nameLower.includes('medium term')
+  )
+    return 'Medium Duration';
   if (nameLower.includes('medium to long')) return 'Medium to Long Duration';
-  if (nameLower.includes('long duration') || nameLower.includes('long term')) return 'Long Duration';
+  if (nameLower.includes('long duration') || nameLower.includes('long term'))
+    return 'Long Duration';
   if (nameLower.includes('dynamic bond')) return 'Dynamic Bond';
   if (nameLower.includes('corporate bond')) return 'Corporate Bond';
   if (nameLower.includes('credit risk')) return 'Credit Risk';
-  if (nameLower.includes('banking and psu') || nameLower.includes('banking & psu')) return 'Banking and PSU';
-  if (nameLower.includes('gilt') || nameLower.includes('government')) return 'Gilt';
+  if (
+    nameLower.includes('banking and psu') ||
+    nameLower.includes('banking & psu')
+  )
+    return 'Banking and PSU';
+  if (nameLower.includes('gilt') || nameLower.includes('government'))
+    return 'Gilt';
   if (nameLower.includes('floater')) return 'Floater';
 
   // Hybrid subcategories
   if (nameLower.includes('aggressive hybrid')) return 'Aggressive Hybrid';
   if (nameLower.includes('conservative hybrid')) return 'Conservative Hybrid';
-  if (nameLower.includes('balanced hybrid') || nameLower.includes('balanced advantage')) return 'Balanced Hybrid';
-  if (nameLower.includes('dynamic asset') || nameLower.includes('dynamic allocation')) return 'Dynamic Asset Allocation';
+  if (
+    nameLower.includes('balanced hybrid') ||
+    nameLower.includes('balanced advantage')
+  )
+    return 'Balanced Hybrid';
+  if (
+    nameLower.includes('dynamic asset') ||
+    nameLower.includes('dynamic allocation')
+  )
+    return 'Dynamic Asset Allocation';
   if (nameLower.includes('multi asset')) return 'Multi Asset Allocation';
   if (nameLower.includes('arbitrage')) return 'Arbitrage';
   if (nameLower.includes('equity savings')) return 'Equity Savings';
@@ -90,9 +157,11 @@ function detectSubcategory(name) {
   if (nameLower.includes('silver')) return 'Silver';
 
   // Index/ETF
-  if (nameLower.includes('nifty 50') || nameLower.includes('nifty50')) return 'Nifty 50';
+  if (nameLower.includes('nifty 50') || nameLower.includes('nifty50'))
+    return 'Nifty 50';
   if (nameLower.includes('nifty next 50')) return 'Nifty Next 50';
-  if (nameLower.includes('nifty bank') || nameLower.includes('bank nifty')) return 'Nifty Bank';
+  if (nameLower.includes('nifty bank') || nameLower.includes('bank nifty'))
+    return 'Nifty Bank';
   if (nameLower.includes('sensex')) return 'Sensex';
 
   return 'Other';
@@ -103,7 +172,7 @@ function detectSubcategory(name) {
  */
 async function parseAMFIData() {
   console.log('📥 Fetching AMFI NAV data...');
-  
+
   const response = await axios.get(AMFI_NAV_URL, {
     timeout: 30000, // 30 seconds
   });
@@ -117,7 +186,7 @@ async function parseAMFIData() {
   for (const line of lines) {
     // Skip header
     if (line.startsWith('Scheme Code')) continue;
-    
+
     // Skip empty lines
     if (!line.trim()) continue;
 
@@ -131,7 +200,7 @@ async function parseAMFIData() {
     }
 
     const parts = line.split(';');
-    
+
     // Valid fund data should have at least 6 parts
     if (parts.length < 6) {
       continue;
@@ -158,11 +227,12 @@ async function parseAMFIData() {
       subcategory,
       amc: {
         name: currentAMC || 'Unknown',
-        code: currentAMC ? currentAMC.replace(/\s+/g, '_').toUpperCase() : 'UNKNOWN',
+        code: currentAMC
+          ? currentAMC.replace(/\s+/g, '_').toUpperCase()
+          : 'UNKNOWN',
       },
       status: 'Active',
       returns: {},
-      riskLevel: category === 'Equity' ? 'High' : category === 'Debt' ? 'Low' : 'Medium',
       minInvestment: category === 'Liquid' ? 1000 : 5000,
       exitLoad: '0% (if redeemed within 1 year)',
       expenseRatio: 0,
@@ -192,10 +262,7 @@ async function saveFundsToDatabase(funds) {
     try {
       // Check if fund already exists
       const existing = await Fund.findOne({
-        $or: [
-          { schemeCode: fundData.schemeCode },
-          { isin: fundData.isin },
-        ],
+        $or: [{ schemeCode: fundData.schemeCode }, { isin: fundData.isin }],
       });
 
       if (existing) {
@@ -243,7 +310,7 @@ async function generateStatistics() {
   console.log('\n📈 Category Breakdown:');
   for (const cat of categories) {
     console.log(`  ${cat._id}: ${cat.count} funds`);
-    
+
     // Get subcategory breakdown
     const subcats = await Fund.aggregate([
       { $match: { category: cat._id } },

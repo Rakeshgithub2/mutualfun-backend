@@ -858,14 +858,14 @@ class FundController {
       } else if (searchQuery) {
         // Use dynamic search service - NEVER shows "not found"
         console.log(`🔍 Dynamic search for: "${searchQuery}"`);
-        
+
         const funds = await DynamicFundSearchService.searchFunds(searchQuery, {
           category: category || null,
           limit: 100,
         });
 
         console.log(`✅ Found ${funds.length} funds for "${searchQuery}"`);
-        
+
         // Transform returns format
         const transformedFunds = funds.map(transformFundReturns);
 
@@ -875,7 +875,10 @@ class FundController {
           query: searchQuery,
           data: transformedFunds,
           count: transformedFunds.length,
-          message: funds[0]?.source === 'AMFI' ? 'Fetched from external API and saved to database' : 'Retrieved from database',
+          message:
+            funds[0]?.source === 'AMFI'
+              ? 'Fetched from external API and saved to database'
+              : 'Retrieved from database',
         });
       }
     } catch (error) {
@@ -996,7 +999,9 @@ class FundController {
     try {
       const { category, subcategory, subCategory } = req.query;
 
-      console.log(`📊 Fetching ALL funds for ${category}/${subcategory || subCategory || 'all'}`);
+      console.log(
+        `📊 Fetching ALL funds for ${category}/${subcategory || subCategory || 'all'}`
+      );
 
       // Use dynamic search service to get all funds
       const funds = await DynamicFundSearchService.getAllFundsByCategory(

@@ -126,7 +126,7 @@ router.get('/funds', async (req, res) => {
             amc: f.fundHouse,
             nav: parseFloat(f.nav),
             returns: {},
-            riskLevel: 'Moderate',
+            riskLevel: 'moderate',
           }));
 
         // STEP 3: Save new funds to database for future searches

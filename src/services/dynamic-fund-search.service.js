@@ -34,7 +34,7 @@ class DynamicFundSearchService {
     if (apiResults.length > 0) {
       // Step 3: Save fetched funds to DB for future searches
       console.log(`💾 Saving ${apiResults.length} funds to DB...`);
-      await this.saveFundsToD B(apiResults);
+      await this.saveFundsToDB(apiResults);
       return apiResults;
     }
 
@@ -47,7 +47,12 @@ class DynamicFundSearchService {
   /**
    * Search local database with fuzzy matching
    */
-  static async searchLocalDB(query, category = null, limit = null, fuzzy = false) {
+  static async searchLocalDB(
+    query,
+    category = null,
+    limit = null,
+    fuzzy = false
+  ) {
     const searchQuery = {
       $or: [
         { name: new RegExp(query, 'i') },
@@ -62,8 +67,8 @@ class DynamicFundSearchService {
 
     // Fuzzy search - more relaxed matching
     if (fuzzy) {
-      const keywords = query.split(' ').filter(word => word.length > 2);
-      searchQuery.$or = keywords.map(keyword => ({
+      const keywords = query.split(' ').filter((word) => word.length > 2);
+      searchQuery.$or = keywords.map((keyword) => ({
         $or: [
           { name: new RegExp(keyword, 'i') },
           { schemeName: new RegExp(keyword, 'i') },
@@ -114,8 +119,9 @@ class DynamicFundSearchService {
    * Fetch from AMFI NAV data
    */
   static async fetchFromAMFI(query, category) {
-    const AMFI_URL = process.env.AMFI_NAV_URL || 'https://www.amfiindia.com/spages/NAVAll.txt';
-    
+    const AMFI_URL =
+      process.env.AMFI_NAV_URL || 'https://www.amfiindia.com/spages/NAVAll.txt';
+
     try {
       const response = await axios.get(AMFI_URL, { timeout: 10000 });
       const lines = response.data.split('\n');
@@ -135,7 +141,7 @@ class DynamicFundSearchService {
         }
 
         const [schemeCode, isin, schemeName, nav, , date] = parts;
-        
+
         // Match query in scheme name
         if (!schemeName.toLowerCase().includes(query.toLowerCase())) {
           continue;
@@ -202,10 +208,7 @@ class DynamicFundSearchService {
       try {
         // Check if fund already exists (by schemeCode or ISIN)
         const existing = await Fund.findOne({
-          $or: [
-            { schemeCode: fundData.schemeCode },
-            { isin: fundData.isin },
-          ],
+          $or: [{ schemeCode: fundData.schemeCode }, { isin: fundData.isin }],
         });
 
         if (!existing) {
@@ -231,15 +234,24 @@ class DynamicFundSearchService {
   static detectCategory(name) {
     const nameLower = name.toLowerCase();
 
-    if (nameLower.includes('equity') || nameLower.includes('elss')) return 'Equity';
-    if (nameLower.includes('debt') || nameLower.includes('bond')) return 'Debt';
-    if (nameLower.includes('hybrid') || nameLower.includes('balanced')) return 'Hybrid';
-    if (nameLower.includes('gold') || nameLower.includes('silver') || nameLower.includes('commodity')) return 'Commodity';
-    if (nameLower.includes('etf') || nameLower.includes('index')) return 'Index';
-    if (nameLower.includes('liquid') || nameLower.includes('ultra short')) return 'Debt';
-    if (nameLower.includes('money market')) return 'Debt';
+    if (nameLower.includes('equity') || nameLower.includes('elss'))
+      return 'equity';
+    if (nameLower.includes('debt') || nameLower.includes('bond')) return 'debt';
+    if (nameLower.includes('hybrid') || nameLower.includes('balanced'))
+      return 'hybrid';
+    if (
+      nameLower.includes('gold') ||
+      nameLower.includes('silver') ||
+      nameLower.includes('commodity')
+    )
+      return 'commodity';
+    if (nameLower.includes('etf') || nameLower.includes('index'))
+      return 'equity';
+    if (nameLower.includes('liquid') || nameLower.includes('ultra short'))
+      return 'debt';
+    if (nameLower.includes('money market')) return 'debt';
 
-    return 'Other';
+    return 'other';
   }
 
   /**
@@ -249,24 +261,41 @@ class DynamicFundSearchService {
     const nameLower = name.toLowerCase();
 
     // Equity subcategories
-    if (nameLower.includes('large cap') || nameLower.includes('bluechip')) return 'Large Cap';
+    if (nameLower.includes('large cap') || nameLower.includes('bluechip'))
+      return 'Large Cap';
     if (nameLower.includes('mid cap')) return 'Mid Cap';
     if (nameLower.includes('small cap')) return 'Small Cap';
-    if (nameLower.includes('flexi cap') || nameLower.includes('multi cap')) return 'Flexi Cap';
+    if (nameLower.includes('flexi cap') || nameLower.includes('multi cap'))
+      return 'Flexi Cap';
     if (nameLower.includes('elss')) return 'ELSS';
     if (nameLower.includes('focused')) return 'Focused';
-    if (nameLower.includes('sectoral') || nameLower.includes('sector') || 
-        nameLower.includes('pharma') || nameLower.includes('banking') || 
-        nameLower.includes('technology') || nameLower.includes('infrastructure')) return 'Sectoral';
+    if (
+      nameLower.includes('sectoral') ||
+      nameLower.includes('sector') ||
+      nameLower.includes('pharma') ||
+      nameLower.includes('banking') ||
+      nameLower.includes('technology') ||
+      nameLower.includes('infrastructure')
+    )
+      return 'Sectoral';
     if (nameLower.includes('value')) return 'Value';
     if (nameLower.includes('dividend yield')) return 'Dividend Yield';
 
     // Debt subcategories
     if (nameLower.includes('liquid')) return 'Liquid';
     if (nameLower.includes('ultra short')) return 'Ultra Short Duration';
-    if (nameLower.includes('short duration') || nameLower.includes('short term')) return 'Short Duration';
-    if (nameLower.includes('medium duration') || nameLower.includes('medium term')) return 'Medium Duration';
-    if (nameLower.includes('long duration') || nameLower.includes('long term')) return 'Long Duration';
+    if (
+      nameLower.includes('short duration') ||
+      nameLower.includes('short term')
+    )
+      return 'Short Duration';
+    if (
+      nameLower.includes('medium duration') ||
+      nameLower.includes('medium term')
+    )
+      return 'Medium Duration';
+    if (nameLower.includes('long duration') || nameLower.includes('long term'))
+      return 'Long Duration';
     if (nameLower.includes('gilt')) return 'Gilt';
     if (nameLower.includes('corporate bond')) return 'Corporate Bond';
     if (nameLower.includes('credit risk')) return 'Credit Risk';
@@ -276,7 +305,11 @@ class DynamicFundSearchService {
     // Hybrid subcategories
     if (nameLower.includes('aggressive hybrid')) return 'Aggressive Hybrid';
     if (nameLower.includes('conservative hybrid')) return 'Conservative Hybrid';
-    if (nameLower.includes('balanced hybrid') || nameLower.includes('balanced advantage')) return 'Balanced Hybrid';
+    if (
+      nameLower.includes('balanced hybrid') ||
+      nameLower.includes('balanced advantage')
+    )
+      return 'Balanced Hybrid';
     if (nameLower.includes('multi asset')) return 'Multi Asset Allocation';
 
     // Commodity
@@ -327,7 +360,9 @@ class DynamicFundSearchService {
       .sort({ 'returns.oneYear': -1, 'returns.1Y': -1 })
       .lean();
 
-    console.log(`📊 Found ${funds.length} funds for ${category}/${subcategory || 'all'}`);
+    console.log(
+      `📊 Found ${funds.length} funds for ${category}/${subcategory || 'all'}`
+    );
     return funds;
   }
 }
