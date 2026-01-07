@@ -116,25 +116,13 @@ const emailWorker = new Worker(
           let result;
           switch (type) {
             case 'verification':
-              result = await emailService.sendEmail({
-                to,
-                subject: 'Verify Your Email',
-                html: `<p>Your verification token: ${data.token}</p>`
-              });
+              result = await emailService.sendVerificationEmail(to, data);
               break;
             case 'reminder':
-              result = await emailService.sendEmail({
-                to,
-                subject: data.subject || 'Reminder',
-                html: data.html || data.message
-              });
+              result = await emailService.sendAlertEmail(to, data);
               break;
             case 'digest':
-              result = await emailService.sendEmail({
-                to,
-                subject: 'Your Digest',
-                html: data.html || data.message
-              });
+              result = await emailService.sendDigestEmail(to, data);
               break;
             default:
               throw new Error(`Unknown email type: ${type}`);
