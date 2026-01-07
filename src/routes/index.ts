@@ -4,7 +4,6 @@ import fundsRoutes from './funds';
 import fundManagersRoutes from './fundManagers';
 import usersRoutes from './users';
 import watchlistRoutes from './watchlist';
-import alertsRoutes from './alerts';
 import portfolioRoutes from './portfolio';
 import investmentRoutes from './investments';
 import kycRoutes from './kyc';
@@ -29,7 +28,6 @@ router.use('/fund-managers', fundManagersRoutes);
 router.use('/suggest', suggestRoutes); // Autocomplete endpoint
 router.use('/users', usersRoutes);
 router.use('/watchlist', watchlistRoutes);
-router.use('/alerts', alertsRoutes);
 router.use('/portfolio', portfolioRoutes);
 router.use('/investments', investmentRoutes);
 router.use('/kyc', kycRoutes);
