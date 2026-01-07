@@ -11,6 +11,9 @@ const rateLimiter = require('../middleware/rateLimiter.middleware');
 // Public routes (with rate limiting)
 router.get('/', rateLimiter.apiLimiter, FundController.getAllFunds);
 
+// 🆕 Get ALL funds without pagination (for category pages)
+router.get('/all', rateLimiter.apiLimiter, FundController.getAllFundsNoPagination);
+
 router.get('/search', rateLimiter.searchLimiter, FundController.searchFunds);
 
 // 🔥 NEW: Smart search with external API fallback

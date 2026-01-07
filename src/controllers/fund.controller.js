@@ -10,6 +10,7 @@ const cacheClient = require('../cache/redis.client');
 const PaginationUtil = require('../utils/pagination.util');
 const DateUtil = require('../utils/date.util');
 const FundEnrichmentService = require('../services/fund-enrichment.service');
+const DynamicFundSearchService = require('../services/dynamic-fund-search.service');
 
 /**
  * Transform fund returns format from 1Y, 3Y to oneYear, threeYear
@@ -855,39 +856,26 @@ class FundController {
           });
         }
       } else if (searchQuery) {
-        // Text search in database
-        const funds = await Fund.find(
-          {
-            $text: { $search: searchQuery },
-            status: 'Active',
-          },
-          { score: { $meta: 'textScore' } }
-        )
-          .sort({ score: { $meta: 'textScore' } })
-          .limit(100) // Increased from 10 to 100 for better search results
-          .lean();
+        // Use dynamic search service - NEVER shows "not found"
+        console.log(`🔍 Dynamic search for: "${searchQuery}"`);
+        
+        const funds = await DynamicFundSearchService.searchFunds(searchQuery, {
+          category: category || null,
+          limit: 100,
+        });
 
-        if (funds.length > 0) {
-          console.log(
-            `✅ Found ${funds.length} funds matching "${searchQuery}"`
-          );
-          return res.json({
-            success: true,
-            source: 'database',
-            cached: true,
-            query: searchQuery,
-            data: funds,
-            count: funds.length,
-          });
-        }
+        console.log(`✅ Found ${funds.length} funds for "${searchQuery}"`);
+        
+        // Transform returns format
+        const transformedFunds = funds.map(transformFundReturns);
 
-        // No results in database, suggest using scheme code
-        return res.status(404).json({
-          success: false,
-          error: 'No funds found',
-          message: `No funds found matching "${searchQuery}". Try searching with a scheme code.`,
-          suggestion:
-            'Use ?schemeCode=119551 to fetch specific fund from external API',
+        return res.json({
+          success: true,
+          source: funds[0]?.source || 'database',
+          query: searchQuery,
+          data: transformedFunds,
+          count: transformedFunds.length,
+          message: funds[0]?.source === 'AMFI' ? 'Fetched from external API and saved to database' : 'Retrieved from database',
         });
       }
     } catch (error) {
@@ -995,6 +983,45 @@ class FundController {
       res.status(500).json({
         success: false,
         error: 'Batch import failed',
+        message: error.message,
+      });
+    }
+  }
+  /**
+   * Get ALL funds without pagination (for category pages)
+   * GET /api/funds/all?category=equity&subcategory=largecap
+   * Returns ALL funds matching criteria - no limits
+   */
+  static async getAllFundsNoPagination(req, res) {
+    try {
+      const { category, subcategory, subCategory } = req.query;
+
+      console.log(`📊 Fetching ALL funds for ${category}/${subcategory || subCategory || 'all'}`);
+
+      // Use dynamic search service to get all funds
+      const funds = await DynamicFundSearchService.getAllFundsByCategory(
+        category,
+        subcategory || subCategory
+      );
+
+      // Transform returns format
+      const transformedFunds = funds.map(transformFundReturns);
+
+      console.log(`✅ Returning ${transformedFunds.length} funds (NO LIMIT)`);
+
+      res.json({
+        success: true,
+        source: 'database',
+        data: transformedFunds,
+        count: transformedFunds.length,
+        message: `Found ${transformedFunds.length} funds`,
+        pagination: false,
+      });
+    } catch (error) {
+      console.error('Error fetching all funds:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch funds',
         message: error.message,
       });
     }
