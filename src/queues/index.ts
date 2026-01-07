@@ -25,7 +25,7 @@ export const ingestionQueue = new Queue('ingestion', {
   },
 });
 
-export const alertQueue = new Queue('alerts', {
+export const reminderQueue = new Queue('reminders', {
   connection: redisConnection,
   defaultJobOptions: {
     removeOnComplete: 5,
@@ -70,8 +70,8 @@ export const enqueueNewsIngest = async (data: any = {}) => {
   });
 };
 
-export const enqueueAlertCheck = async (data: any = {}) => {
-  return alertQueue.add(JobType.ALERT_CHECK, data);
+export const enqueueReminderCheck = async (data: any = {}) => {
+  return reminderQueue.add(JobType.REMINDER_CHECK, data);
 };
 
 export const enqueueSendEmail = async (data: any) => {
@@ -84,7 +84,7 @@ export const enqueueSendEmail = async (data: any) => {
 export const closeQueues = async () => {
   await Promise.all([
     ingestionQueue.close(),
-    alertQueue.close(),
+    reminderQueue.close(),
     emailQueue.close(),
   ]);
 };

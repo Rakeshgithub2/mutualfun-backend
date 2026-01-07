@@ -9,19 +9,75 @@ const FundHolding = require('../models/FundHolding.model');
 const cacheClient = require('../cache/redis.client');
 const PaginationUtil = require('../utils/pagination.util');
 const DateUtil = require('../utils/date.util');
+const FundEnrichmentService = require('../services/fund-enrichment.service');
+
+/**
+ * Transform fund returns format from 1Y, 3Y to oneYear, threeYear
+ * @param {Object} fund - Fund object
+ * @returns {Object} - Transformed fund object
+ */
+function transformFundReturns(fund) {
+  const transformed = { ...fund };
+
+  // Extract NAV value if it's an object
+  if (
+    fund.currentNav &&
+    typeof fund.currentNav === 'object' &&
+    fund.currentNav.value
+  ) {
+    transformed.currentNav = fund.currentNav.value;
+  } else if (fund.nav && typeof fund.nav === 'object' && fund.nav.value) {
+    transformed.currentNav = fund.nav.value;
+  }
+
+  // Use name field, fallback to schemeName
+  if (!transformed.name && fund.schemeName) {
+    transformed.name = fund.schemeName;
+  }
+
+  // Transform returns format
+  if (fund && fund.returns) {
+    transformed.returns = {
+      day: fund.returns['1D'],
+      week: fund.returns['1W'],
+      month: fund.returns['1M'],
+      threeMonth: fund.returns['3M'],
+      sixMonth: fund.returns['6M'],
+      oneYear: fund.returns['1Y'],
+      threeYear: fund.returns['3Y'],
+      fiveYear: fund.returns['5Y'],
+      sinceInception: fund.returns.sinceInception,
+      // Keep original format for backward compatibility
+      '1D': fund.returns['1D'],
+      '1W': fund.returns['1W'],
+      '1M': fund.returns['1M'],
+      '3M': fund.returns['3M'],
+      '6M': fund.returns['6M'],
+      '1Y': fund.returns['1Y'],
+      '3Y': fund.returns['3Y'],
+      '5Y': fund.returns['5Y'],
+    };
+  }
+
+  return transformed;
+}
 
 class FundController {
   /**
    * Get all funds (paginated)
-   * GET /api/funds?page=1&limit=20&category=Equity&subCategory=Large Cap
+   * GET /api/funds?page=1&limit=20&category=equity&subcategory=largecap
+   *
+   * SUPPORTS BOTH NAMING CONVENTIONS:
+   * - New: category, subcategory (lowercase)
+   * - Old: category, subCategory (mixed case)
    */
   static async getAllFunds(req, res) {
     try {
       const { page, limit, skip } = PaginationUtil.parsePaginationParams(req);
-      const { category, subCategory, amc, status = 'Active' } = req.query;
+      const { category, subcategory, subCategory, amc, status } = req.query;
 
       // Build cache key
-      const cacheKey = `funds:list:${page}:${limit}:${category || 'all'}:${subCategory || 'all'}:${amc || 'all'}`;
+      const cacheKey = `funds:list:${page}:${limit}:${category || 'all'}:${subcategory || subCategory || 'all'}:${amc || 'all'}`;
 
       // Check cache
       const cached = await cacheClient.get(cacheKey);
@@ -33,11 +89,52 @@ class FundController {
         });
       }
 
-      // Build query
-      const query = { status };
-      if (category) query.category = category;
-      if (subCategory) query.subCategory = subCategory;
-      if (amc) query['amc.name'] = new RegExp(amc, 'i');
+      // Build query - support both field names
+      const query = {};
+      const andConditions = [];
+
+      // Category filter (case-insensitive)
+      if (category) {
+        query.category = new RegExp(`^${category}$`, 'i');
+      }
+
+      // Subcategory filter (support both subcategory and subCategory fields, case-insensitive)
+      const subCat = subcategory || subCategory;
+      if (subCat) {
+        andConditions.push({
+          $or: [
+            { subcategory: new RegExp(`^${subCat}$`, 'i') },
+            { subCategory: new RegExp(`^${subCat}$`, 'i') },
+          ],
+        });
+      }
+
+      // AMC filter
+      if (amc) {
+        query['amc.name'] = new RegExp(amc, 'i');
+      }
+
+      // Status filter - Include Active status OR null status (imported funds)
+      if (!status) {
+        // Default: only active or null status
+        andConditions.push({
+          $or: [
+            { status: 'Active' },
+            { status: null },
+            { status: { $exists: false } },
+          ],
+        });
+      } else {
+        query.status = status;
+      }
+
+      // Combine all AND conditions
+      if (andConditions.length > 0) {
+        query.$and = andConditions;
+      }
+
+      // Debug logging
+      console.log('📊 Query:', JSON.stringify(query, null, 2));
 
       // Execute query with pagination
       const [funds, total] = await Promise.all([
@@ -45,12 +142,20 @@ class FundController {
           .select('-__v')
           .skip(skip)
           .limit(limit)
-          .sort({ 'returns.1Y': -1 })
+          .sort({ 'returns.oneYear': -1, 'returns.1Y': -1 })
           .lean(),
         Fund.countDocuments(query),
       ]);
 
-      const response = PaginationUtil.buildResponse(funds, page, limit, total);
+      // Transform returns format for frontend compatibility
+      const transformedFunds = funds.map(transformFundReturns);
+
+      const response = PaginationUtil.buildResponse(
+        transformedFunds,
+        page,
+        limit,
+        total
+      );
 
       // Cache result
       await cacheClient.set(cacheKey, response, 86400); // 24h
@@ -71,15 +176,24 @@ class FundController {
   }
 
   /**
-   * Get fund by scheme code
-   * GET /api/funds/:schemeCode
+   * Get fund by ID (MongoDB ObjectId)
+   * GET /api/funds/id/:id
    */
-  static async getFundBySchemeCode(req, res) {
+  static async getFundById(req, res) {
     try {
-      const { schemeCode } = req.params;
+      const { id } = req.params;
+
+      // Validate MongoDB ObjectId
+      if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid fund ID format',
+        });
+      }
 
       // Check cache
-      const cached = await cacheClient.getFund(schemeCode);
+      const cacheKey = `fund:id:${id}`;
+      const cached = await cacheClient.get(cacheKey);
       if (cached) {
         return res.json({
           success: true,
@@ -88,26 +202,133 @@ class FundController {
         });
       }
 
-      // Query database
-      const fund = await Fund.findOne({ schemeCode, status: 'Active' })
-        .select('-__v')
-        .lean();
+      // Query database by _id
+      const fund = await Fund.findById(id).select('-__v').lean();
 
       if (!fund) {
         return res.status(404).json({
           success: false,
           error: 'Fund not found',
-          message: `No fund found with scheme code: ${schemeCode}`,
+          message: `No fund found with ID: ${id}`,
         });
       }
 
       // Cache result
-      await cacheClient.cacheFund(schemeCode, fund);
+      await cacheClient.set(cacheKey, transformFundReturns(fund), 86400); // 24h
+
+      // Enrich fund data with missing information
+      const enrichedFund = FundEnrichmentService.enrichFundData(fund);
 
       res.json({
         success: true,
         source: 'database',
-        data: fund,
+        data: transformFundReturns(enrichedFund),
+      });
+    } catch (error) {
+      console.error('Error fetching fund by ID:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch fund',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Get fund by scheme code or MongoDB ID
+   * GET /api/funds/scheme/:schemeCode OR GET /api/funds/:schemeCode
+   *
+   * ENHANCED:
+   * - Accepts both schemeCode (e.g., 140539) and MongoDB ObjectId
+   * - Fetches from DB first, if not found fetches from API and stores in DB
+   */
+  static async getFundBySchemeCode(req, res) {
+    try {
+      const { schemeCode } = req.params;
+
+      // Check if it's a MongoDB ObjectId
+      const isMongoId = schemeCode.match(/^[0-9a-fA-F]{24}$/);
+
+      // Check cache
+      const cacheKey = isMongoId
+        ? `fund:id:${schemeCode}`
+        : `fund:scheme:${schemeCode}`;
+      const cached = await cacheClient.get(cacheKey);
+      if (cached) {
+        return res.json({
+          success: true,
+          source: 'cache',
+          data: cached,
+        });
+      }
+
+      // Query database - by _id if MongoDB ObjectId, otherwise by schemeCode
+      let fund;
+      if (isMongoId) {
+        fund = await Fund.findById(schemeCode).select('-__v').lean();
+      } else {
+        fund = await Fund.findOne({ schemeCode }).select('-__v').lean();
+      }
+
+      // If not found in database, fetch from external API (only for schemeCode, not for _id)
+      if (!fund && !isMongoId) {
+        console.log(
+          `🔍 Fund ${schemeCode} not in database, fetching from API...`
+        );
+
+        try {
+          // Dynamically import MFAPI service
+          const MFAPIService = require('../services/mfapi.service.js');
+          const mfapiService = new MFAPIService();
+
+          // Fetch from API
+          const apiFundData =
+            await mfapiService.fetchFundBySchemeCode(schemeCode);
+
+          if (apiFundData) {
+            // Store in database for future requests
+            console.log(
+              `💾 Storing new fund in database: ${apiFundData.schemeName}`
+            );
+            fund = await Fund.create(apiFundData);
+            fund = fund.toObject();
+            delete fund.__v;
+
+            // Cache the newly fetched fund
+            await cacheClient.set(cacheKey, transformFundReturns(fund), 86400);
+
+            return res.json({
+              success: true,
+              source: 'api-realtime',
+              message: 'Fund fetched from external API and stored in database',
+              data: transformFundReturns(fund),
+            });
+          }
+        } catch (apiError) {
+          console.error(`❌ Error fetching from API: ${apiError.message}`);
+          // Continue to 404 response below
+        }
+      }
+
+      // If still not found
+      if (!fund) {
+        return res.status(404).json({
+          success: false,
+          error: 'Fund not found',
+          message: `No fund found with identifier: ${schemeCode}`,
+        });
+      }
+
+      // Cache result
+      await cacheClient.set(cacheKey, transformFundReturns(fund), 86400);
+
+      // Enrich fund data with missing information
+      const enrichedFund = FundEnrichmentService.enrichFundData(fund);
+
+      res.json({
+        success: true,
+        source: 'database',
+        data: transformFundReturns(enrichedFund),
       });
     } catch (error) {
       console.error('Error fetching fund:', error);
@@ -139,18 +360,31 @@ class FundController {
         });
       }
 
-      // Query database
+      // Query database with status filter that includes null
+      const statusFilter = {
+        $or: [
+          { status: 'Active' },
+          { status: null },
+          { status: { $exists: false } },
+        ],
+      };
       const [funds, total] = await Promise.all([
-        Fund.find({ category, status: 'Active' })
+        Fund.find({ category, ...statusFilter })
           .select('-__v')
           .skip(skip)
           .limit(limit)
-          .sort({ 'returns.1Y': -1 })
+          .sort({ 'returns.oneYear': -1, 'returns.1Y': -1 })
           .lean(),
-        Fund.countDocuments({ category, status: 'Active' }),
+        Fund.countDocuments({ category, ...statusFilter }),
       ]);
 
-      const response = PaginationUtil.buildResponse(funds, page, limit, total);
+      const transformedFunds = funds.map(transformFundReturns);
+      const response = PaginationUtil.buildResponse(
+        transformedFunds,
+        page,
+        limit,
+        total
+      );
 
       // Cache result
       await cacheClient.set(cacheKey, response, 86400); // 24h
@@ -190,17 +424,33 @@ class FundController {
       }
 
       // Query database
+      const query = { subCategory: subcategory };
+      // Only filter by Active status if status field exists
+      const statusFilter = {
+        $or: [
+          { status: 'Active' },
+          { status: null },
+          { status: { $exists: false } },
+        ],
+      };
+
       const [funds, total] = await Promise.all([
-        Fund.find({ subCategory: subcategory, status: 'Active' })
+        Fund.find({ ...query, ...statusFilter })
           .select('-__v')
           .skip(skip)
           .limit(limit)
-          .sort({ 'returns.1Y': -1 })
+          .sort({ 'returns.oneYear': -1, 'returns.1Y': -1 })
           .lean(),
-        Fund.countDocuments({ subCategory: subcategory, status: 'Active' }),
+        Fund.countDocuments({ ...query, ...statusFilter }),
       ]);
 
-      const response = PaginationUtil.buildResponse(funds, page, limit, total);
+      const transformedFunds = funds.map(transformFundReturns);
+      const response = PaginationUtil.buildResponse(
+        transformedFunds,
+        page,
+        limit,
+        total
+      );
 
       // Cache result
       await cacheClient.cacheFundsBySubcategory(subcategory, response);
@@ -268,7 +518,13 @@ class FundController {
         }),
       ]);
 
-      const response = PaginationUtil.buildResponse(funds, page, limit, total);
+      const transformedFunds = funds.map(transformFundReturns);
+      const response = PaginationUtil.buildResponse(
+        transformedFunds,
+        page,
+        limit,
+        total
+      );
 
       // Cache result
       await cacheClient.set(cacheKey, response, 21600); // 6h
@@ -423,17 +679,19 @@ class FundController {
         .limit(parseInt(limit))
         .lean();
 
+      const transformedFunds = funds.map(transformFundReturns);
+
       // Cache result
-      await cacheClient.set(cacheKey, funds, 86400); // 24h
+      await cacheClient.set(cacheKey, transformedFunds, 86400); // 24h
 
       res.json({
         success: true,
         source: 'database',
-        data: funds,
+        data: transformedFunds,
         meta: {
           period,
           category: category || 'all',
-          count: funds.length,
+          count: transformedFunds.length,
         },
       });
     } catch (error) {
@@ -606,7 +864,7 @@ class FundController {
           { score: { $meta: 'textScore' } }
         )
           .sort({ score: { $meta: 'textScore' } })
-          .limit(10)
+          .limit(100) // Increased from 10 to 100 for better search results
           .lean();
 
         if (funds.length > 0) {

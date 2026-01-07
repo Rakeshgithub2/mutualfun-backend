@@ -4,7 +4,6 @@ import { JobType } from './types/jobs';
 import { amfiService } from './services/amfiService';
 import { yahooFinanceService } from './services/yahooFinanceService';
 import { newsService } from './services/newsService';
-import { alertService } from './services/alertService';
 import { emailService } from './services/emailService';
 
 // Load environment variables
@@ -74,33 +73,31 @@ const ingestionWorker = new Worker(
   }
 );
 
-// Alert Worker
-const alertWorker = new Worker(
-  'alerts',
+// Reminder Worker
+const reminderWorker = new Worker(
+  'reminders',
   async (job) => {
-    console.log(`Processing alert job: ${job.name} (${job.id})`);
+    console.log(`Processing reminder job: ${job.name} (${job.id})`);
 
     try {
       switch (job.name) {
-        case JobType.ALERT_CHECK:
-          console.log('Checking user alerts...');
-          const alertResult = await alertService.checkAlerts();
-          console.log(
-            `Alert check completed. Checked: ${alertResult.checked}, Triggered: ${alertResult.triggered}, Errors: ${alertResult.errors.length}`
-          );
-          return alertResult;
+        case JobType.REMINDER_CHECK:
+          console.log('Checking user reminders...');
+          // Reminder service is handled by backend cron job
+          console.log('Reminder service handled by backend cron');
+          return { checked: 0, sent: 0, errors: [] };
 
         default:
-          throw new Error(`Unknown alert job type: ${job.name}`);
+          throw new Error(`Unknown reminder job type: ${job.name}`);
       }
     } catch (error) {
-      console.error(`Alert job ${job.name} failed:`, error);
+      console.error(`Reminder job ${job.name} failed:`, error);
       throw error;
     }
   },
   {
     connection: redisConnection,
-    concurrency: 3, // Process 3 alert jobs concurrently
+    concurrency: 3, // Process 3 reminder jobs concurrently
   }
 );
 
@@ -121,8 +118,8 @@ const emailWorker = new Worker(
             case 'verification':
               result = await emailService.sendVerificationEmail(to, data.token);
               break;
-            case 'alert':
-              result = await emailService.sendAlertEmail(to, data.alerts);
+            case 'reminder':
+              result = await emailService.sendReminderEmail(to, data);
               break;
             case 'digest':
               result = await emailService.sendDigestEmail(to, data);
@@ -169,7 +166,7 @@ const setupWorkerEvents = (worker: Worker, name: string) => {
 
 // Setup event handlers for all workers
 setupWorkerEvents(ingestionWorker, 'Ingestion');
-setupWorkerEvents(alertWorker, 'Alert');
+setupWorkerEvents(reminderWorker, 'Reminder');
 setupWorkerEvents(emailWorker, 'Email');
 
 // Graceful shutdown
@@ -178,7 +175,7 @@ const gracefulShutdown = async () => {
 
   await Promise.all([
     ingestionWorker.close(),
-    alertWorker.close(),
+    reminderWorker.close(),
     emailWorker.close(),
   ]);
 
@@ -192,5 +189,5 @@ process.on('SIGINT', gracefulShutdown);
 console.log('🚀 Workers started successfully!');
 console.log('Listening for jobs on:');
 console.log('  - Ingestion queue (concurrency: 2)');
-console.log('  - Alert queue (concurrency: 3)');
+console.log('  - Reminder queue (concurrency: 3)');
 console.log('  - Email queue (concurrency: 5)');

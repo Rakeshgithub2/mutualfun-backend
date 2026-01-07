@@ -28,6 +28,7 @@ router.post(
   rateLimiter.authLimiter,
   AuthController.forgotPassword
 );
+router.post('/resend-otp', rateLimiter.authLimiter, AuthController.resendOTP);
 router.post('/verify-otp', rateLimiter.authLimiter, AuthController.verifyOTP);
 router.post(
   '/reset-password',
@@ -39,6 +40,11 @@ router.post(
 // GOOGLE OAUTH ROUTES
 // ============================================================================
 
+// Modern Google OAuth: Frontend sends ID token directly
+// POST /api/auth/google with { token: "google-id-token" }
+router.post('/google', rateLimiter.authLimiter, AuthController.googleSignIn);
+
+// Legacy Google OAuth flow (for backwards compatibility)
 // Step 1: Initiate Google OAuth flow
 // Frontend calls this to get Google authorization URL
 router.get('/google', AuthController.googleAuth);

@@ -11,14 +11,20 @@ const REDIS_CONFIG = {
   password: process.env.REDIS_PASSWORD || undefined,
   db: parseInt(process.env.REDIS_DB || '0'),
   retryStrategy: (times) => {
+    // Stop retrying after 3 attempts
+    if (times > 3) {
+      console.warn('⚠️ Redis unavailable - running without cache');
+      return null; // Stop retrying
+    }
     const delay = Math.min(times * 50, 2000);
     return delay;
   },
   maxRetriesPerRequest: 3,
   enableReadyCheck: true,
-  enableOfflineQueue: true,
-  lazyConnect: false,
+  enableOfflineQueue: false, // Don't queue commands when offline
+  lazyConnect: true, // Connect only when needed
   keepAlive: 30000,
+  connectTimeout: 5000, // 5 second connection timeout
 };
 
 class RedisConfig {
@@ -31,13 +37,27 @@ class RedisConfig {
    * Connect to Redis
    */
   async connect() {
+    // Check if Redis is disabled
+    if (
+      process.env.REDIS_HOST === 'disabled' ||
+      process.env.REDIS_URL === 'disabled'
+    ) {
+      console.log('ℹ️ Redis is disabled - running without cache');
+      return null;
+    }
+
     if (this.isConnected && this.client) {
       console.log('🔥 Redis: Already connected');
       return this.client;
     }
 
     try {
-      this.client = new Redis(REDIS_CONFIG);
+      // Use REDIS_URL if provided, otherwise use individual config
+      const connectionConfig = process.env.REDIS_URL
+        ? process.env.REDIS_URL
+        : REDIS_CONFIG;
+
+      this.client = new Redis(connectionConfig);
 
       this.client.on('connect', () => {
         console.log('✅ Redis connected successfully');
@@ -45,17 +65,26 @@ class RedisConfig {
       });
 
       this.client.on('error', (error) => {
-        console.error('❌ Redis error:', error.message);
+        // Only log first error to avoid spam
+        if (this.isConnected) {
+          console.error('❌ Redis error:', error.message);
+        }
         this.isConnected = false;
       });
 
       this.client.on('close', () => {
-        console.warn('⚠️ Redis connection closed');
+        // Only log if we were previously connected
+        if (this.isConnected) {
+          console.warn('⚠️ Redis connection closed - running without cache');
+        }
         this.isConnected = false;
       });
 
-      this.client.on('reconnecting', () => {
-        console.log('🔄 Redis reconnecting...');
+      this.client.on('reconnecting', (attempt) => {
+        // Only log first reconnect attempt
+        if (attempt === 1) {
+          console.log('🔄 Redis reconnecting...');
+        }
       });
 
       // Wait for connection

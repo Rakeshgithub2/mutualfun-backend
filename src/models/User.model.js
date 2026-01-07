@@ -77,6 +77,11 @@ const userSchema = new mongoose.Schema(
       type: Date,
       select: false,
     },
+    refreshTokens: {
+      type: [String],
+      default: [],
+      select: false, // Don't include in queries by default
+    },
     preferences: {
       currency: {
         type: String,

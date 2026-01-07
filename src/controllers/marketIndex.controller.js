@@ -14,22 +14,52 @@ class MarketIndexController {
    */
   static async getAllIndices(req, res) {
     try {
-      // Check cache
-      const cached = await cacheClient.getAllIndices();
-      if (cached) {
-        return res.json({
-          success: true,
-          source: 'cache',
-          data: cached,
-          marketStatus: MarketHoursUtil.getMarketStatus(),
-        });
+      // ✅ BYPASS CACHE - Query database directly for now
+      console.log('📊 Fetching market indices from database...');
+
+      // Define the specific indices we want to display (lowercase names as per schema)
+      const requiredNames = [
+        'nifty50',
+        'sensex',
+        'niftymidcap',
+        'niftysmallcap',
+        'niftybank',
+        'niftyit',
+        'niftypharma',
+        'niftyauto',
+        'niftyfmcg',
+        'niftymetal',
+        'commodity',
+        'giftnifty',
+      ];
+
+      // Query database for all active indices (name field contains lowercase values)
+      console.log(
+        '🔍 Querying marketindices collection with names:',
+        requiredNames
+      );
+      const indices = await MarketIndex.find({
+        name: { $in: requiredNames },
+      })
+        .sort({ name: 1 })
+        .lean();
+
+      console.log(`📊 Found ${indices.length} indices in database`);
+      if (indices.length > 0) {
+        console.log('📊 First index:', indices[0]);
+      } else {
+        // Debug: Try finding all documents
+        const allDocs = await MarketIndex.find({}).lean();
+        console.log(`📊 Total documents in collection: ${allDocs.length}`);
+        if (allDocs.length > 0) {
+          console.log('📊 Sample doc:', allDocs[0]);
+        }
       }
 
-      // Query database
-      const indices = await MarketIndex.getActiveIndices();
-
-      // Cache result
-      await cacheClient.cacheAllIndices(indices);
+      // Cache result only if we have data
+      if (indices && indices.length > 0) {
+        await cacheClient.cacheAllIndices(indices);
+      }
 
       res.json({
         success: true,
@@ -54,30 +84,23 @@ class MarketIndexController {
   static async getIndexBySymbol(req, res) {
     try {
       const { symbol } = req.params;
+      const indexName = symbol.toLowerCase(); // Convert to lowercase
 
-      // Check cache
-      const cached = await cacheClient.getMarketIndex(symbol.toUpperCase());
-      if (cached) {
-        return res.json({
-          success: true,
-          source: 'cache',
-          data: cached,
-        });
-      }
+      console.log('🔍 Fetching index:', indexName);
 
-      // Query database
-      const index = await MarketIndex.getIndexBySymbol(symbol);
+      // Query database by name (lowercase)
+      const index = await MarketIndex.findOne({ name: indexName }).lean();
 
       if (!index) {
+        console.log('❌ Index not found:', indexName);
         return res.status(404).json({
           success: false,
           error: 'Index not found',
-          message: `No index found with symbol: ${symbol}`,
+          message: `No index found with name: ${indexName}`,
         });
       }
 
-      // Cache result
-      await cacheClient.cacheMarketIndex(symbol.toUpperCase(), index);
+      console.log('✅ Found index:', index.name, index.value);
 
       res.json({
         success: true,

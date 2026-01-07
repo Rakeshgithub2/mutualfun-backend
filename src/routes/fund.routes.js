@@ -40,6 +40,28 @@ router.get(
   FundController.getFundsBySubcategory
 );
 
+// Get fund by MongoDB ID (must come before :schemeCode to avoid conflict)
+router.get('/id/:id', rateLimiter.apiLimiter, FundController.getFundById);
+
+router.get(
+  '/scheme/:schemeCode',
+  rateLimiter.apiLimiter,
+  FundController.getFundBySchemeCode
+);
+
+router.get(
+  '/scheme/:schemeCode/nav',
+  rateLimiter.apiLimiter,
+  FundController.getFundNavHistory
+);
+
+router.get(
+  '/scheme/:schemeCode/holdings',
+  rateLimiter.apiLimiter,
+  FundController.getFundHoldings
+);
+
+// Legacy route - keeping for backward compatibility
 router.get(
   '/:schemeCode',
   rateLimiter.apiLimiter,

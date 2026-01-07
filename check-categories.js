@@ -1,64 +1,49 @@
 const mongoose = require('mongoose');
 
+const MONGODB_URI =
+  'mongodb+srv://harshshukladev:Harsh%401729@cluster0.tplse.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0';
+
 async function checkCategories() {
   try {
-    await mongoose.connect(
-      'mongodb+srv://rakeshd01042024_db_user:<db_password>@mutualfunds.l7zeno9.mongodb.net/?appName=mutualfunds'
-    );
+    await mongoose.connect(MONGODB_URI);
+    console.log('✅ Connected to MongoDB');
 
-    const Fund = require('./src/models/Fund');
+    const db = mongoose.connection.db;
 
-    // Check for equity funds with proper subcategories
-    const equity = await Fund.find({
-      category: 'equity',
-      subCategory: { $ne: 'Other' },
-    }).limit(10);
+    // Get unique categories
+    const categories = await db
+      .collection('funds')
+      .aggregate([
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ])
+      .toArray();
 
-    console.log('=== EQUITY FUNDS WITH PROPER SUBCATEGORIES ===');
-    equity.forEach((f) => {
-      console.log(
-        `${f.name} | ${f.subCategory} | ${f.fundHouse} | NAV: ${f.currentNav}`
-      );
+    console.log('\n📊 CATEGORIES IN DATABASE:');
+    console.log('========================');
+    categories.forEach((r) => {
+      console.log(`  ${r._id || '(empty)'}: ${r.count} funds`);
     });
+    console.log(`\nTotal: ${categories.length} unique categories`);
 
-    // Get all distinct subcategories for equity
-    const allSubCategories = await Fund.distinct('subCategory', {
-      category: 'equity',
-    });
-    console.log('\n=== ALL EQUITY SUBCATEGORIES IN DB ===');
-    console.log(allSubCategories);
-
-    // Count funds by subcategory
-    const categoryCounts = await Fund.aggregate([
-      { $match: { category: 'equity' } },
-      { $group: { _id: '$subCategory', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-    ]);
-    console.log('\n=== EQUITY FUNDS COUNT BY SUBCATEGORY ===');
-    categoryCounts.forEach((cat) => {
-      console.log(`${cat._id}: ${cat.count} funds`);
-    });
-
-    // Check recent funds (by _id which contains creation timestamp)
-    const recent = await Fund.find({ category: 'equity' })
-      .sort({ _id: -1 })
-      .limit(10);
-
-    console.log('\n=== MOST RECENTLY ADDED EQUITY FUNDS ===');
-    recent.forEach((f) => {
-      console.log(`${f.name} | ${f.subCategory} | NAV: ${f.currentNav}`);
-    });
-
-    // Check commodity funds
-    const commodity = await Fund.find({ category: 'commodity' }).limit(5);
-    console.log('\n=== COMMODITY FUNDS ===');
-    commodity.forEach((f) => {
-      console.log(`${f.name} | ${f.subCategory} | NAV: ${f.currentNav}`);
-    });
+    // Sample funds from each category
+    console.log('\n📋 SAMPLE FUNDS PER CATEGORY:');
+    console.log('========================');
+    for (const cat of categories.slice(0, 5)) {
+      const samples = await db
+        .collection('funds')
+        .find({ category: cat._id })
+        .limit(2)
+        .toArray();
+      console.log(`\n${cat._id}:`);
+      samples.forEach((f) => console.log(`  - ${f.schemeName}`));
+    }
 
     await mongoose.disconnect();
+    console.log('\n✅ Done');
   } catch (error) {
-    console.error('Error:', error);
+    console.error('❌ Error:', error.message);
+    process.exit(1);
   }
 }
 

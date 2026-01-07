@@ -1,96 +1,97 @@
-const { MongoClient } = require('mongodb');
+// Check subcategories for each main category
+const http = require('http');
 
-async function checkSubcategories() {
-  const client = new MongoClient(
-    'mongodb+srv://rakeshd01042024_db_user:<db_password>@mutualfunds.l7zeno9.mongodb.net/?appName=mutualfunds'
+async function testAPI(url) {
+  return new Promise((resolve) => {
+    http
+      .get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(data);
+            resolve(json);
+          } catch (e) {
+            resolve(null);
+          }
+        });
+      })
+      .on('error', () => resolve(null));
+  });
+}
+
+async function getSubcategories(category, label) {
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`📊 ${label.toUpperCase()} SUBCATEGORIES`);
+  console.log('='.repeat(60));
+
+  // Fetch first 100 funds from this category
+  const result = await testAPI(
+    `http://localhost:3002/api/funds?category=${category}&limit=100`
   );
 
-  try {
-    await client.connect();
-    const db = client.db('mutual_funds_db');
-    const fundsCollection = db.collection('funds');
+  if (!result || !result.success) {
+    console.log(`❌ Failed to fetch ${label} funds`);
+    return;
+  }
 
-    // Get all equity subcategories with counts
-    const equitySubcategories = await fundsCollection
-      .aggregate([
-        { $match: { category: 'equity', isActive: true } },
-        { $group: { _id: '$subCategory', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-      ])
-      .toArray();
+  console.log(`Total ${label} funds: ${result.pagination.totalItems}`);
 
-    console.log('=== ALL EQUITY SUBCATEGORIES ===');
-    equitySubcategories.forEach((sub) => {
-      console.log(`${sub._id}: ${sub.count} funds`);
-    });
+  // Extract unique subcategories
+  const subcategories = {};
+  result.data.forEach((fund) => {
+    const subCat = fund.subCategory || 'Unknown';
+    subcategories[subCat] = (subcategories[subCat] || 0) + 1;
+  });
 
-    // Check for our required subcategories
-    const requiredSubs = ['Large Cap', 'Mid Cap', 'Small Cap'];
-    console.log('\n=== REQUIRED SUBCATEGORY CHECK ===');
+  // Sort by count
+  const sorted = Object.entries(subcategories).sort((a, b) => b[1] - a[1]);
 
-    for (const reqSub of requiredSubs) {
-      const found = equitySubcategories.find((s) => s._id === reqSub);
-      if (found) {
-        console.log(`✅ ${reqSub}: ${found.count} funds available`);
+  console.log(
+    `\nFound ${sorted.length} subcategories (from first 100 funds):\n`
+  );
+  sorted.forEach(([subCat, count]) => {
+    console.log(`  ${count.toString().padStart(3)} | ${subCat}`);
+  });
+}
 
-        // Get samples
-        const samples = await fundsCollection
-          .find({
-            category: 'equity',
-            subCategory: reqSub,
-            isActive: true,
-          })
-          .limit(3)
-          .toArray();
+async function searchCommodity() {
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`🔍 SEARCHING FOR COMMODITY FUNDS`);
+  console.log('='.repeat(60));
 
-        samples.forEach((f) => {
-          console.log(`   ${f.name} | NAV: ${f.currentNav}`);
-        });
-      } else {
-        console.log(`❌ ${reqSub}: NOT FOUND`);
-      }
+  const keywords = ['gold', 'silver', 'commodity'];
+
+  for (const keyword of keywords) {
+    const result = await testAPI(
+      `http://localhost:3002/api/search/funds?q=${keyword}&limit=20`
+    );
+
+    if (result && result.success && result.data.results) {
+      console.log(
+        `\n"${keyword.toUpperCase()}" - Found ${result.data.results.length} funds:`
+      );
+      result.data.results.slice(0, 5).forEach((fund) => {
+        console.log(`  - ${fund.schemeName.substring(0, 70)}...`);
+        console.log(
+          `    Category: ${fund.category} | SubCategory: ${fund.subCategory}`
+        );
+      });
     }
-
-    // Check the API filter array
-    const apiEquitySubcategories = [
-      'Large Cap',
-      'Mid Cap',
-      'Small Cap',
-      'Multi Cap',
-      'Flexi Cap',
-      'ELSS',
-      'Sectoral',
-      'Thematic',
-      'Value Fund',
-      'Contra Fund',
-      'Dividend Yield',
-      'Focused Fund',
-      'Large & Mid Cap',
-    ];
-
-    console.log('\n=== API FILTER COVERAGE CHECK ===');
-    const coveredFunds = await fundsCollection.countDocuments({
-      category: 'equity',
-      subCategory: { $in: apiEquitySubcategories },
-      isActive: true,
-    });
-
-    const totalEquityFunds = await fundsCollection.countDocuments({
-      category: 'equity',
-      isActive: true,
-    });
-
-    console.log(
-      `API filter covers: ${coveredFunds} out of ${totalEquityFunds} equity funds`
-    );
-    console.log(
-      `Coverage: ${((coveredFunds / totalEquityFunds) * 100).toFixed(1)}%`
-    );
-  } catch (error) {
-    console.error('Error:', error);
-  } finally {
-    await client.close();
   }
 }
 
-checkSubcategories();
+async function main() {
+  console.log('\n🔍 ANALYZING FUND CATEGORIES AND SUBCATEGORIES...\n');
+
+  await getSubcategories('equity', 'Equity');
+  await getSubcategories('debt', 'Debt');
+  await getSubcategories('hybrid', 'Hybrid');
+  await searchCommodity();
+
+  console.log('\n' + '='.repeat(60));
+  console.log('✅ ANALYSIS COMPLETE');
+  console.log('='.repeat(60) + '\n');
+}
+
+main();

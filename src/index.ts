@@ -13,6 +13,13 @@ import { mongodb } from './db/mongodb';
 
 // Import Market Indices Service for auto-update
 import { marketIndicesService } from './services/marketIndices.service';
+import marketHistoryRoutes from './routes/market-history';
+
+// Import new professional data sync services
+const { initializeServices } = require('./init');
+
+// Import Reminder Scheduler for real-time user reminders
+const { startReminderScheduler } = require('./schedulers/reminder.scheduler');
 
 // Load environment variables
 dotenv.config();
@@ -87,6 +94,9 @@ app.get('/api/test', (req, res) => {
 // API routes
 app.use('/api', routes);
 
+// Market history routes (historical data for charts)
+app.use('/api/market', marketHistoryRoutes);
+
 // Market Indices endpoint (live auto-updating data)
 app.get('/api/market/summary', async (req, res) => {
   try {
@@ -155,6 +165,14 @@ if (process.env.NODE_ENV !== 'test') {
       // Initialize market indices data
       await initializeMarketIndices();
 
+      // Initialize professional data sync services (NAV + Market Indices)
+      await initializeServices();
+
+      // Start real-time reminder scheduler
+      console.log('⏰ Starting reminder scheduler...');
+      startReminderScheduler();
+      console.log('✅ Reminder scheduler active - checking every 5 minutes');
+
       const server = httpServer.listen(Number(PORT), '0.0.0.0', () => {
         console.log(`✅ Server is running on http://0.0.0.0:${PORT}`);
         console.log(`✅ Server is running on http://localhost:${PORT}`);
@@ -164,10 +182,9 @@ if (process.env.NODE_ENV !== 'test') {
         );
         console.log('🎯 Server is alive and listening for requests');
 
-        // Start Market Indices Auto-Update Service
-        // TODO: Implement auto-update service for market indices
-        console.log('📈 Market indices service ready');
-        console.log('💡 Market indices will refresh on each API call');
+        // Professional data services now active
+        console.log('📈 Professional data sync services active');
+        console.log('💡 NAV: Daily 6 PM IST | Indices: Hourly during trading');
 
         // Keep the process alive - multiple strategies
         process.stdin.resume();

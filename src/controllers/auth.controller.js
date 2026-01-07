@@ -62,11 +62,6 @@ class AuthController {
 
       await user.save();
 
-      // Send welcome email (don't wait for it)
-      EmailService.sendWelcomeEmail(user.email, user.firstName).catch((err) =>
-        console.error('Welcome email failed:', err)
-      );
-
       // Generate tokens
       const accessToken = authConfig.generateAccessToken({
         userId: user._id,
@@ -80,6 +75,16 @@ class AuthController {
         role: user.role,
       });
 
+      // Save refresh token to database
+      user.refreshTokens = user.refreshTokens || [];
+      user.refreshTokens.push(refreshToken);
+      await user.save();
+
+      // Send welcome email (don't wait for it)
+      EmailService.sendWelcomeEmail(user.email, {
+        name: user.firstName || user.email,
+      }).catch((err) => console.error('Welcome email failed:', err));
+
       res.status(201).json({
         success: true,
         message: 'User registered successfully',
@@ -90,6 +95,7 @@ class AuthController {
             firstName: user.firstName,
             lastName: user.lastName,
             role: user.role,
+            profilePicture: user.profilePicture,
           },
           accessToken,
           refreshToken,
@@ -155,6 +161,10 @@ class AuthController {
         role: user.role,
       });
 
+      // Save refresh token to database
+      user.refreshTokens = user.refreshTokens || [];
+      user.refreshTokens.push(refreshToken);
+
       // Update last login
       user.lastLogin = new Date();
       await user.save();
@@ -169,6 +179,7 @@ class AuthController {
             firstName: user.firstName,
             lastName: user.lastName,
             role: user.role,
+            profilePicture: user.profilePicture,
           },
           accessToken,
           refreshToken,
@@ -351,13 +362,21 @@ class AuthController {
   }
 
   /**
-   * Logout (client-side token invalidation)
+   * Logout - Remove refresh token from database
    * POST /api/auth/logout
    */
   static async logout(req, res) {
     try {
-      // In a stateless JWT system, logout is handled client-side
-      // Optionally, you can maintain a blacklist of tokens
+      const { refreshToken } = req.body;
+      const userId = req.user?.userId; // From auth middleware if available
+
+      if (userId && refreshToken) {
+        // Remove the specific refresh token from user's tokens array
+        await User.findByIdAndUpdate(userId, {
+          $pull: { refreshTokens: refreshToken },
+        });
+        console.log(`Removed refresh token for user: ${userId}`);
+      }
 
       res.json({
         success: true,
@@ -368,6 +387,140 @@ class AuthController {
       res.status(500).json({
         success: false,
         error: 'Logout failed',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Modern Google OAuth Sign-In
+   * POST /api/auth/google
+   * Frontend sends Google ID token directly
+   */
+  static async googleSignIn(req, res) {
+    try {
+      const { token } = req.body;
+
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          error: 'Token missing',
+          message: 'Google ID token is required',
+        });
+      }
+
+      const { GOOGLE_CLIENT_ID } = process.env;
+
+      if (!GOOGLE_CLIENT_ID) {
+        return res.status(500).json({
+          success: false,
+          error: 'Google OAuth not configured',
+          message: 'Missing Google Client ID',
+        });
+      }
+
+      // Verify Google ID token
+      const { OAuth2Client } = require('google-auth-library');
+      const client = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+      const ticket = await client.verifyIdToken({
+        idToken: token,
+        audience: GOOGLE_CLIENT_ID,
+      });
+
+      const payload = ticket.getPayload();
+      if (!payload) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid token',
+          message: 'Google token verification failed',
+        });
+      }
+
+      // Extract user data from Google payload
+      const {
+        sub: googleId,
+        email,
+        name,
+        given_name: firstName,
+        family_name: lastName,
+        picture,
+      } = payload;
+
+      // Find or create user
+      let user = await User.findOne({ email: email.toLowerCase() });
+
+      if (!user) {
+        // Create new user
+        user = new User({
+          email: email.toLowerCase(),
+          firstName: firstName || name,
+          lastName: lastName || '',
+          profilePicture: picture,
+          authProvider: 'google',
+          googleId,
+          role: 'user',
+          emailVerified: true,
+        });
+        await user.save();
+
+        // Send welcome email
+        try {
+          await EmailService.sendWelcomeEmail(user.email, {
+            name: user.firstName || user.email,
+          });
+        } catch (emailError) {
+          console.error('Failed to send welcome email:', emailError);
+        }
+      } else {
+        // Update existing user
+        user.authProvider = 'google';
+        user.googleId = googleId;
+        if (!user.profilePicture) user.profilePicture = picture;
+        user.lastLogin = new Date();
+        user.emailVerified = true;
+        await user.save();
+      }
+
+      // Generate JWT tokens
+      const accessToken = authConfig.generateAccessToken({
+        userId: user._id,
+        email: user.email,
+      });
+
+      const refreshToken = authConfig.generateRefreshToken({
+        userId: user._id,
+        email: user.email,
+      });
+
+      // Save refresh token to database
+      user.refreshTokens = user.refreshTokens || [];
+      user.refreshTokens.push(refreshToken);
+      await user.save();
+
+      res.json({
+        success: true,
+        message: 'Google sign-in successful',
+        data: {
+          accessToken: accessToken,
+          refreshToken,
+          user: {
+            userId: user._id,
+            email: user.email,
+            name: user.firstName + ' ' + user.lastName,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            picture: user.profilePicture,
+            emailVerified: user.emailVerified,
+            authMethod: 'google',
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Google sign-in failed',
         message: error.message,
       });
     }
@@ -552,15 +705,8 @@ class AuthController {
         });
       }
 
-      // Check if user is a Google OAuth user
-      if (user.authProvider === 'google') {
-        return res.status(400).json({
-          success: false,
-          error: 'Google account',
-          message:
-            'Please use Google to sign in. Password reset is not available for Google accounts.',
-        });
-      }
+      // Allow password reset for all users (including Google OAuth users)
+      // This gives them flexibility to use both Google login and email/password login
 
       // Generate 6-digit OTP
       const otp = crypto.randomInt(100000, 999999).toString();
@@ -586,15 +732,94 @@ class AuthController {
         });
       }
 
+      // Include helpful message for Google users
+      const message =
+        user.authProvider === 'google'
+          ? 'OTP sent! Note: Setting a password will allow you to login with email/password in addition to Google.'
+          : 'OTP sent to your email. Valid for 10 minutes.';
+
       res.json({
         success: true,
-        message: 'OTP sent to your email. Valid for 10 minutes.',
+        message: message,
       });
     } catch (error) {
       console.error('Forgot password error:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to process request',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Resend OTP
+   * POST /api/auth/resend-otp
+   */
+  static async resendOTP(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing email',
+          message: 'Email is required',
+        });
+      }
+
+      // Find user
+      const user = await User.findOne({ email: email.toLowerCase() });
+      if (!user) {
+        // Don't reveal if user exists for security
+        return res.json({
+          success: true,
+          message:
+            'If an account exists with this email, you will receive an OTP',
+        });
+      }
+
+      // Allow password reset for all users (including Google OAuth users)
+
+      // Generate new 6-digit OTP
+      const otp = crypto.randomInt(100000, 999999).toString();
+      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Update OTP in user document
+      user.resetPasswordOTP = otp;
+      user.resetPasswordOTPExpiry = otpExpiry;
+      await user.save();
+
+      // Send OTP email
+      const emailResult = await EmailService.sendPasswordResetOTP(
+        user.email,
+        otp,
+        user.firstName
+      );
+
+      if (!emailResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: 'Email sending failed',
+          message: 'Failed to send OTP. Please try again.',
+        });
+      }
+
+      // Include helpful message for Google users
+      const message =
+        user.authProvider === 'google'
+          ? 'New OTP sent! Note: Setting a password will allow you to login with email/password in addition to Google.'
+          : 'New OTP sent to your email. Valid for 10 minutes.';
+
+      res.json({
+        success: true,
+        message: message,
+      });
+    } catch (error) {
+      console.error('Resend OTP error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to resend OTP',
         message: error.message,
       });
     }
@@ -616,8 +841,10 @@ class AuthController {
         });
       }
 
-      // Find user
-      const user = await User.findOne({ email: email.toLowerCase() });
+      // Find user and include password reset fields (they have select: false)
+      const user = await User.findOne({ email: email.toLowerCase() }).select(
+        '+resetPasswordOTP +resetPasswordOTPExpiry'
+      );
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -682,28 +909,37 @@ class AuthController {
    */
   static async resetPassword(req, res) {
     try {
-      const { email, resetToken, newPassword } = req.body;
+      const { email, resetToken, otp, newPassword } = req.body;
 
-      if (!email || !resetToken || !newPassword) {
+      if (!email || !newPassword) {
         return res.status(400).json({
           success: false,
           error: 'Missing fields',
-          message: 'Email, reset token, and new password are required',
+          message: 'Email and new password are required',
         });
       }
 
-      // Validate password strength
-      const passwordValidation = authConfig.validatePassword(newPassword);
-      if (!passwordValidation.isValid) {
+      if (!resetToken && !otp) {
         return res.status(400).json({
           success: false,
-          error: 'Weak password',
-          message: passwordValidation.errors,
+          error: 'Missing verification',
+          message: 'Either reset token or OTP is required',
         });
       }
 
-      // Find user
-      const user = await User.findOne({ email: email.toLowerCase() });
+      // Simple password validation - just check minimum length
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({
+          success: false,
+          error: 'Password too short',
+          message: 'Password must be at least 6 characters',
+        });
+      }
+
+      // Find user and include password reset fields
+      const user = await User.findOne({ email: email.toLowerCase() }).select(
+        '+resetPasswordOTP +resetPasswordOTPExpiry +resetPasswordToken +resetPasswordTokenExpiry'
+      );
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -712,21 +948,65 @@ class AuthController {
         });
       }
 
-      // Verify reset token
-      if (!user.resetPasswordToken || user.resetPasswordToken !== resetToken) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid token',
-          message: 'Invalid or expired reset token',
-        });
+      // Verify using OTP or resetToken
+      let isValid = false;
+
+      if (otp) {
+        // Verify using OTP directly
+        if (!user.resetPasswordOTP || !user.resetPasswordOTPExpiry) {
+          return res.status(400).json({
+            success: false,
+            error: 'No OTP requested',
+            message: 'Please request a password reset first',
+          });
+        }
+
+        if (new Date() > user.resetPasswordOTPExpiry) {
+          return res.status(400).json({
+            success: false,
+            error: 'OTP expired',
+            message: 'OTP has expired. Please request a new one.',
+          });
+        }
+
+        if (user.resetPasswordOTP !== otp) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid OTP',
+            message: 'The OTP you entered is incorrect',
+          });
+        }
+
+        isValid = true;
+      } else if (resetToken) {
+        // Verify using reset token
+        if (
+          !user.resetPasswordToken ||
+          user.resetPasswordToken !== resetToken
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid token',
+            message: 'Invalid or expired reset token',
+          });
+        }
+
+        if (new Date() > user.resetPasswordTokenExpiry) {
+          return res.status(400).json({
+            success: false,
+            error: 'Token expired',
+            message: 'Reset token has expired. Please start over.',
+          });
+        }
+
+        isValid = true;
       }
 
-      // Check if token expired
-      if (new Date() > user.resetPasswordTokenExpiry) {
+      if (!isValid) {
         return res.status(400).json({
           success: false,
-          error: 'Token expired',
-          message: 'Reset token has expired. Please start over.',
+          error: 'Verification failed',
+          message: 'Could not verify your identity',
         });
       }
 

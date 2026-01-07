@@ -132,7 +132,7 @@ async function insertMockFunds(collection: any): Promise<void> {
       amfiCode: '119551',
       name: 'HDFC Mid-Cap Opportunities Fund - Direct Plan - Growth',
       category: 'equity',
-      subCategory: 'Mid Cap',
+      subCategory: 'midcap',
       fundType: 'mutual_fund',
       fundHouse: 'HDFC',
       currentNav: 189.45,
@@ -151,7 +151,7 @@ async function insertMockFunds(collection: any): Promise<void> {
       amfiCode: '120503',
       name: 'SBI Blue Chip Fund - Direct Plan - Growth',
       category: 'equity',
-      subCategory: 'Large Cap',
+      subCategory: 'largecap',
       fundType: 'mutual_fund',
       fundHouse: 'SBI',
       currentNav: 125.67,
@@ -170,7 +170,7 @@ async function insertMockFunds(collection: any): Promise<void> {
       amfiCode: '118989',
       name: 'Axis Bluechip Fund - Direct Plan - Growth',
       category: 'equity',
-      subCategory: 'Large Cap',
+      subCategory: 'largecap',
       fundType: 'mutual_fund',
       fundHouse: 'Axis',
       currentNav: 87.32,
@@ -227,19 +227,19 @@ function categorizeScheme(schemeName: string): string {
 function getSubCategory(schemeName: string): string {
   const name = schemeName.toLowerCase();
   if (name.includes('large cap') || name.includes('bluechip'))
-    return 'Large Cap';
-  if (name.includes('mid cap')) return 'Mid Cap';
-  if (name.includes('small cap')) return 'Small Cap';
+    return 'largecap';
+  if (name.includes('mid cap')) return 'midcap';
+  if (name.includes('small cap')) return 'smallcap';
   if (name.includes('multi cap') || name.includes('multicap'))
-    return 'Multi Cap';
+    return 'multicap';
   if (name.includes('flexi cap') || name.includes('flexicap'))
-    return 'Flexi Cap';
-  if (name.includes('elss') || name.includes('tax')) return 'ELSS';
-  if (name.includes('gold')) return 'Gold';
-  if (name.includes('silver')) return 'Silver';
-  if (name.includes('liquid')) return 'Liquid';
-  if (name.includes('overnight')) return 'Overnight';
-  return 'Others';
+    return 'flexicap';
+  if (name.includes('elss') || name.includes('tax')) return 'elss';
+  if (name.includes('gold')) return 'gold';
+  if (name.includes('silver')) return 'silver';
+  if (name.includes('liquid')) return 'liquid';
+  if (name.includes('overnight')) return 'overnight';
+  return 'others';
 }
 
 function extractFundHouse(schemeName: string): string {

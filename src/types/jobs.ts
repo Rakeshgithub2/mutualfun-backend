@@ -2,7 +2,7 @@ export enum JobType {
   AMFI_INGEST = 'AMFI_INGEST',
   YAHOO_INGEST = 'YAHOO_INGEST',
   NEWS_INGEST = 'NEWS_INGEST',
-  ALERT_CHECK = 'ALERT_CHECK',
+  REMINDER_CHECK = 'REMINDER_CHECK',
   SEND_EMAIL = 'SEND_EMAIL',
 }
 
@@ -22,21 +22,20 @@ export interface NewsIngestJobData {
   keywords?: string[];
 }
 
-export interface AlertCheckJobData {
+export interface ReminderCheckJobData {
   userId?: string;
-  fundId?: string;
 }
 
 export interface SendEmailJobData {
   to: string;
   subject: string;
-  template: 'verification' | 'alert' | 'digest';
+  template: 'verification' | 'reminder' | 'digest';
   data: Record<string, any>;
 }
 
-export type JobData = 
+export type JobData =
   | AMFIIngestJobData
   | YahooIngestJobData
   | NewsIngestJobData
-  | AlertCheckJobData
+  | ReminderCheckJobData
   | SendEmailJobData;

@@ -10,14 +10,14 @@ const fundSchema = new mongoose.Schema(
     // Basic Information
     schemeCode: {
       type: String,
-      required: true,
+      required: false, // Not required for imported funds
       unique: true,
+      sparse: true, // Only enforce uniqueness when field exists (allows multiple nulls)
       index: true,
     },
     schemeName: {
       type: String,
-      required: true,
-      index: 'text',
+      required: false, // Optional for imported funds that use 'name' field instead
     },
     isinDivPayout: String,
     isinDivReinvestment: String,
@@ -175,8 +175,8 @@ fundSchema.index({ 'returns.1Y': -1 });
 fundSchema.index({ 'returns.3Y': -1 });
 fundSchema.index({ categoryRank: 1 });
 
-// Text index for search
-fundSchema.index({ schemeName: 'text', 'amc.name': 'text' });
+// Text index for search - Using only schemeName to match existing index
+fundSchema.index({ schemeName: 'text' });
 
 // Virtual for NAV trend
 fundSchema.virtual('navTrend').get(function () {

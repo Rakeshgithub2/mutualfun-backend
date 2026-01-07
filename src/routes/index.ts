@@ -19,6 +19,7 @@ import taxRoutes from './tax';
 import aiRoutes from './ai';
 import suggestRoutes from './suggest';
 import feedbackRoutes from './feedback';
+import v2Routes from './v2.routes';
 
 const router = Router();
 
@@ -42,5 +43,6 @@ router.use('/comparison', comparisonRoutes);
 router.use('/tax', taxRoutes);
 router.use('/ai', aiRoutes);
 router.use('/feedback', feedbackRoutes);
+router.use('/v2', v2Routes); // Professional architecture routes
 
 export default router;

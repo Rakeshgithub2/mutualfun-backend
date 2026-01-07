@@ -4,21 +4,51 @@ const newsService = require('../services/newsService');
 
 /**
  * @route   GET /api/news
- * @desc    Get top 20 financial news with language support
+ * @desc    Get all financial news with language support
  * @access  Public
  */
 router.get('/', async (req, res) => {
   try {
-    const { language = 'english' } = req.query;
+    const { language = 'english', limit } = req.query;
 
     const news = await newsService.getNews(language);
+
+    console.log('Raw articles from DB:', news?.articles?.length || 0);
+    if (news?.articles?.[0]) {
+      console.log('Sample article keys:', Object.keys(news.articles[0]));
+      console.log(
+        'Sample article data:',
+        JSON.stringify(news.articles[0], null, 2)
+      );
+    }
+
+    // Map articles to frontend-expected format
+    const mappedArticles = (news?.articles || []).map((article) => ({
+      id: article?._id?.toString() || article?.id || '',
+      title: article?.title || '',
+      description: article?.summary || article?.description || '',
+      content: article?.fullContent || article?.content || '',
+      source: article?.source || '',
+      category: article?.category || 'general',
+      published_at:
+        article?.publishedAt ||
+        article?.published_at ||
+        new Date().toISOString(),
+      url: article?.url || '',
+      image_url: article?.imageUrl || article?.image_url || '',
+    }));
+
+    console.log('Mapped articles count:', mappedArticles?.length);
+    if (mappedArticles?.[0]) {
+      console.log('Sample mapped:', JSON.stringify(mappedArticles[0], null, 2));
+    }
 
     res.json({
       success: true,
       data: {
-        articles: news.articles,
-        lastUpdated: news.lastUpdated,
-        totalCount: news.articles.length,
+        articles: mappedArticles,
+        lastUpdated: news?.lastUpdated || new Date(),
+        totalCount: mappedArticles.length,
       },
     });
   } catch (error) {
@@ -49,19 +79,9 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    // Get related news
-    const relatedNews = await newsService.getRelatedNews(
-      article.category,
-      id,
-      5
-    );
-
     res.json({
       success: true,
-      data: {
-        article,
-        relatedNews,
-      },
+      data: article,
     });
   } catch (error) {
     console.error('Error fetching article:', error);

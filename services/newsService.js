@@ -2,9 +2,9 @@ const axios = require('axios');
 const { mongodb } = require('../src/db/mongodb');
 const { translate } = require('./translationService');
 
-// News API configuration
-const NEWS_API_KEY = process.env.NEWS_API_KEY || 'demo_key';
-const NEWS_API_URL = 'https://newsapi.org/v2/everything';
+// NewsData.io API configuration
+// Get your free API key from https://newsdata.io (200 requests/day)
+const NEWSDATA_API_KEY = process.env.NEWSDATA_API_KEY;
 
 // News count configuration - use 8 for testing, 20 for production/scheduled
 const NEWS_COUNT_TESTING = 8;
@@ -38,24 +38,48 @@ const FINANCIAL_KEYWORDS = [
 ];
 
 /**
- * Fetch news from API
+ * Fetch news from NewsData.io API
  * @param {number} count - Number of articles to fetch (default: 20 for scheduled, 8 for testing)
  */
 const fetchFinancialNews = async (count = NEWS_COUNT_PRODUCTION) => {
   try {
-    const response = await axios.get(NEWS_API_URL, {
+    const NEWSDATA_API_KEY = process.env.NEWSDATA_API_KEY;
+
+    if (!NEWSDATA_API_KEY || NEWSDATA_API_KEY === 'YOUR_KEY') {
+      console.log('⚠️  NewsData API key not configured, using mock data');
+      return getMockNews();
+    }
+
+    const response = await axios.get('https://newsdata.io/api/1/news', {
       params: {
-        q: 'stocks OR mutual funds OR market OR investment',
+        apikey: NEWSDATA_API_KEY,
+        q: 'mutual funds OR stock market OR investment OR gold OR sensex OR nifty',
         language: 'en',
-        sortBy: 'publishedAt',
-        pageSize: Math.min(count * 3, 50), // Fetch 3x to filter down, max 50
-        apiKey: NEWS_API_KEY,
+        country: 'in',
+        category: 'business',
+        size: count,
       },
+      timeout: 15000,
     });
 
-    return response.data.articles;
+    if (!response.data || !response.data.results) {
+      console.log('⚠️  Invalid API response, using mock data');
+      return getMockNews();
+    }
+
+    // Convert NewsData.io format to our format
+    return response.data.results.map((article) => ({
+      title: article.title,
+      description: article.description || article.title,
+      content: article.content || article.description || article.title,
+      source: { name: article.source_id || 'NewsData' },
+      publishedAt: article.pubDate,
+      urlToImage: article.image_url,
+      url: article.link,
+      author: article.creator ? article.creator[0] : null,
+    }));
   } catch (error) {
-    console.error('Error fetching from News API:', error.message);
+    console.error('Error fetching from NewsData API:', error.message);
     // Fallback to mock data if API fails
     return getMockNews();
   }
@@ -296,23 +320,30 @@ const storeTranslations = async (articles) => {
 const getNews = async (language = 'english') => {
   try {
     const db = mongodb.db;
-    const newsCollection = db.collection('news');
-    const translationsCollection = db.collection('news_translations');
+    const MarketNews = require('../src/models/MarketNews.model');
 
-    // Get latest news
-    const newsDoc = await newsCollection.findOne({ _id: 'latest_news' });
+    // Get latest news from MarketNews collection
+    const articles = await MarketNews.find()
+      .sort({ published_at: -1 })
+      .limit(50)
+      .lean();
 
-    if (!newsDoc || !newsDoc.articles) {
+    if (!articles || articles.length === 0) {
       return {
         articles: [],
         lastUpdated: new Date(),
       };
     }
 
-    let articles = newsDoc.articles;
+    // Transform _id to id for frontend
+    const transformedArticles = articles.map((article) => ({
+      ...article,
+      id: article._id.toString(),
+    }));
 
     // If language is not English, get translations
     if (language !== 'english' && language !== 'en') {
+      const translationsCollection = db.collection('news_translations');
       const langMap = {
         hindi: 'hi',
         hi: 'hi',
@@ -334,22 +365,27 @@ const getNews = async (language = 'english') => {
       });
 
       // Apply translations
-      articles = articles.map((article) => {
+      const translatedArticles = transformedArticles.map((article) => {
         const translation = translationMap[article.id];
         if (translation) {
           return {
             ...article,
             title: translation.title,
-            summary: translation.summary,
+            description: translation.summary || article.description,
           };
         }
         return article;
       });
+
+      return {
+        articles: translatedArticles,
+        lastUpdated: new Date(),
+      };
     }
 
     return {
-      articles: articles,
-      lastUpdated: newsDoc.lastUpdated || new Date(),
+      articles: transformedArticles,
+      lastUpdated: new Date(),
     };
   } catch (error) {
     console.error('Error getting news:', error);
@@ -426,8 +462,27 @@ const getArticleById = async (id) => {
       return null;
     }
 
+    // Find article by id field
     const article = newsDoc.articles.find((a) => a.id === id);
-    return article || null;
+
+    if (article) {
+      // Return article with proper structure mapping stored fields to expected fields
+      return {
+        id: article.id,
+        title: article.title,
+        description: article.summary || article.description,
+        content: article.fullContent || article.content || article.summary,
+        source: article.source,
+        source_name: article.source,
+        category: article.category,
+        published_at: article.publishedAt || article.published_at,
+        url: article.url,
+        image_url: article.imageUrl || article.urlToImage || article.image_url,
+        author: article.author,
+      };
+    }
+
+    return null;
   } catch (error) {
     console.error('Error getting article by ID:', error);
     throw error;

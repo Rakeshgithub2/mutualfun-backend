@@ -3,7 +3,7 @@ import {
   enqueueAMFIIngest,
   enqueueYahooIngest,
   enqueueNewsIngest,
-  enqueueAlertCheck,
+  enqueueReminderCheck,
 } from '../queues';
 
 // Helper function to get IST date
@@ -121,16 +121,16 @@ export class Scheduler {
       'Asia/Kolkata'
     );
 
-    // ALERT_CHECK - Every 5 minutes
-    const alertJob = new CronJob(
+    // REMINDER_CHECK - Every 5 minutes
+    const reminderJob = new CronJob(
       '*/5 * * * *', // Every 5 minutes
       async () => {
-        console.log('Enqueueing alert check job...');
+        console.log('Enqueueing reminder check job...');
         try {
-          await enqueueAlertCheck({});
-          console.log('Alert check job enqueued successfully');
+          await enqueueReminderCheck({});
+          console.log('Reminder check job enqueued successfully');
         } catch (error) {
-          console.error('Failed to enqueue alert check job:', error);
+          console.error('Failed to enqueue reminder check job:', error);
         }
       },
       null,
@@ -151,7 +151,7 @@ export class Scheduler {
       'Asia/Kolkata'
     );
 
-    this.jobs = [amfiJob, yahooJob, newsJob, alertJob, digestJob];
+    this.jobs = [amfiJob, yahooJob, newsJob, reminderJob, digestJob];
   }
 
   start() {
@@ -208,7 +208,7 @@ export class Scheduler {
     console.log('1. AMFI Ingestion: Daily at 3:00 AM IST');
     console.log('2. Yahoo Finance: Daily at 1:00 AM IST');
     console.log('3. News Ingestion: Hourly 9 AM-3 PM IST (weekdays)');
-    console.log('4. Alert Check: Every 5 minutes');
+    console.log('4. Reminder Check: Every 5 minutes');
     console.log('5. Daily Digest: 8:00 AM IST (weekdays)');
     console.log('=====================\n');
 
@@ -250,9 +250,9 @@ export class Scheduler {
     });
   }
 
-  async triggerAlertCheck() {
-    console.log('Manually triggering alert check...');
-    await enqueueAlertCheck({});
+  async triggerReminderCheck() {
+    console.log('Manually triggering reminder check...');
+    await enqueueReminderCheck({});
   }
 }
 

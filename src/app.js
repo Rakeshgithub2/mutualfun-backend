@@ -14,6 +14,7 @@ const dbConfig = require('./config/db.config');
 const redisConfig = require('./config/redis.config');
 const cacheClient = require('./cache/redis.client');
 const schedulerUtil = require('./utils/scheduler.util');
+const masterCronScheduler = require('../cron/scheduler'); // Master cron scheduler for 15K+ funds
 
 // Import jobs
 const dailyNavJob = require('./jobs/dailyNav.job');
@@ -28,9 +29,14 @@ const RateLimiterMiddleware = require('./middleware/rateLimiter.middleware');
 const authRoutes = require('./routes/auth.routes');
 const fundRoutes = require('./routes/fund.routes');
 const marketIndexRoutes = require('./routes/marketIndex.routes');
+const marketHistoryRoutes = require('./routes/market-history.routes');
 const watchlistRoutes = require('./routes/watchlist.routes');
 const goalRoutes = require('./routes/goal.routes');
 const reminderRoutes = require('./routes/reminder.routes');
+const newsRoutes = require('./routes/news.routes');
+const indicesRoutes = require('./routes/indices.routes');
+const aiRoutes = require('./routes/ai.routes');
+const searchRoutes = require('./routes/search.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,15 +55,21 @@ app.use(
   })
 );
 
-// CORS
+// CORS - Must specify exact origin when using credentials: 'include'
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? process.env.FRONTEND_URL
+        : ['http://localhost:5001', 'http://localhost:3000'], // Explicit origins for development
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+
+// Handle preflight requests explicitly
+app.options('*', cors());
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
@@ -113,6 +125,8 @@ app.get('/', (req, res) => {
       watchlist: '/api/watchlist',
       goals: '/api/goals',
       reminders: '/api/reminders',
+      news: '/api/news',
+      ai: '/api/ai',
     },
   });
 });
@@ -121,9 +135,14 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/funds', fundRoutes);
 app.use('/api/market', marketIndexRoutes);
+app.use('/api/market', marketHistoryRoutes); // Historical data endpoint
 app.use('/api/watchlist', watchlistRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/reminders', reminderRoutes);
+app.use('/api/news', newsRoutes);
+app.use('/api/indices', indicesRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/search', searchRoutes); // Mobile-first search API
 
 // ==================== ERROR HANDLING ====================
 
@@ -155,6 +174,24 @@ app.use((error, req, res, next) => {
 
 function setupScheduler() {
   console.log('\n📅 Setting up cron jobs...\n');
+
+  // Initialize Master Cron Scheduler (15K+ funds system)
+  console.log('🔄 Initializing Master Cron Scheduler...');
+  masterCronScheduler.initializeJobs();
+  masterCronScheduler.start();
+
+  // Display schedule information
+  const scheduleInfo = masterCronScheduler.getScheduleInfo();
+  console.log('\n📋 Master Scheduler - Update Frequencies:');
+  console.log('  ├─ NAV Updates:', scheduleInfo.nav);
+  console.log('  ├─ Daily Returns:', scheduleInfo.dailyReturns);
+  console.log('  ├─ Monthly Updates:', scheduleInfo.monthlyUpdates);
+  console.log('  ├─ Holdings:', scheduleInfo.holdings);
+  console.log('  ├─ Fund Managers:', scheduleInfo.fundManagers);
+  console.log('  └─ Market Indices:', scheduleInfo.marketIndices);
+
+  // Legacy cron jobs (for backward compatibility)
+  console.log('\n📅 Setting up legacy cron jobs...\n');
 
   // Daily NAV update @ 9:30 PM IST
   schedulerUtil.scheduleJob(
@@ -229,7 +266,8 @@ process.on('SIGTERM', async () => {
   console.log('\n🛑 SIGTERM received, shutting down gracefully...');
 
   // Stop cron jobs
-  schedulerUtil.stopAllJobs();
+  masterCronScheduler.stop(); // Stop master scheduler
+  schedulerUtil.stopAllJobs(); // Stop legacy jobs
 
   // Close database connections
   await dbConfig.disconnect();
@@ -242,7 +280,8 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   console.log('\n🛑 SIGINT received, shutting down gracefully...');
 
-  // Stop cron jobs
+  masterCronScheduler.stop(); // Stop master scheduler
+  schedulerUtil.stopAllJobs(); // Stop legacy jobs
   schedulerUtil.stopAllJobs();
 
   // Close database connections

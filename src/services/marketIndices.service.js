@@ -10,46 +10,7 @@
  */
 
 const axios = require('axios');
-const mongoose = require('mongoose');
-
-// Market Indices Schema
-const marketIndexSchema = new mongoose.Schema(
-  {
-    index: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    value: {
-      type: Number,
-      required: true,
-    },
-    change: {
-      type: Number,
-      required: true,
-    },
-    changePercent: {
-      type: Number,
-      required: true,
-    },
-    high: Number,
-    low: Number,
-    open: Number,
-    previousClose: Number,
-    volume: Number,
-    lastUpdated: {
-      type: Date,
-      default: Date.now,
-    },
-    isMarketOpen: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  { timestamps: true }
-);
-
-const MarketIndex = mongoose.model('MarketIndex', marketIndexSchema);
+const MarketIndex = require('../models/MarketIndex.model');
 
 class MarketIndicesService {
   constructor() {
@@ -243,28 +204,41 @@ class MarketIndicesService {
         return;
       }
 
-      // Update or create index
+      // Safely extract values with defaults
+      const value = data.value || data.regularMarketPrice || 0;
+      const change = data.change || 0;
+      const changePercent = data.changePercent || 0;
+      const high = data.high || value;
+      const low = data.low || value;
+      const open = data.open || value;
+      const previousClose = data.previousClose || value;
+      const volume = data.volume || 0;
+
+      // Update or create index using the centralized model
       await MarketIndex.findOneAndUpdate(
-        { index: indexName },
+        { symbol: indexName.toUpperCase().replace(/\s/g, '_') },
         {
-          index: indexName,
-          value: data.value || data.regularMarketPrice,
-          change: data.change,
-          changePercent: data.changePercent,
-          high: data.high,
-          low: data.low,
-          open: data.open,
-          previousClose: data.previousClose,
-          volume: data.volume,
+          symbol: indexName.toUpperCase().replace(/\s/g, '_'),
+          name: indexName,
+          value: value,
+          change: {
+            value: change,
+            percent: changePercent,
+          },
+          high: high,
+          low: low,
+          open: open,
+          previousClose: previousClose,
+          volume: volume,
           lastUpdated: new Date(),
-          isMarketOpen: isOpen,
-          dataSource: source, // Track which API worked
+          marketStatus: isOpen ? 'OPEN' : 'CLOSED',
+          isActive: true,
         },
         { upsert: true, new: true }
       );
 
       console.log(
-        `✅ Updated ${indexName} from ${source}: ${data.value} (${data.changePercent > 0 ? '+' : ''}${data.changePercent.toFixed(2)}%)`
+        `✅ Updated ${indexName} from ${source}: ${value} (${changePercent > 0 ? '+' : ''}${changePercent.toFixed(2)}%)`
       );
     } catch (error) {
       console.error(`❌ Error updating ${indexName}:`, error.message);
