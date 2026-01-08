@@ -20,7 +20,7 @@ import suggestRoutes from './suggest';
 import feedbackRoutes from './feedback';
 import v2Routes from './v2.routes';
 import searchRoutes from './search.routes';
-import holdingsRoutes from './holdings.routes';
+// import holdingsRoutes from './holdings.routes'; // TEMP DISABLED - debugging import issues
 
 const router = Router();
 
@@ -40,7 +40,7 @@ router.use('/kyc', kycRoutes);
 
 // Market Data routes
 router.use('/market-indices', marketIndicesRoutes);
-router.use('/holdings', holdingsRoutes);
+// router.use('/holdings', holdingsRoutes); // TEMP DISABLED - debugging import issues
 router.use('/news', newsRoutes);
 router.use('/rankings', rankingsRoutes);
 
