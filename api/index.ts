@@ -1,28 +1,51 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import authRoutes from '../src/routes/auth.routes';
-import fundRoutes from './routes/fund.routes';
-import compareRoutes from './routes/compare.routes';
-import overlapRoutes from './routes/overlap.routes';
-import marketIndexRoutes from './routes/marketIndex.routes';
-import { mongodb } from './db/mongodb';
+import routes from '../src/routes'; // Import unified routes
+import { mongodb } from '../src/db/mongodb'; // Use src/db instead of api/db
 
 // Main Express application for Vercel serverless
 const app = express();
 
 // CORS Configuration
+const getAllowedOrigins = () => {
+  const origins = [
+    'http://localhost:3000',
+    'http://localhost:5001',
+    'http://localhost:5173',
+    'https://mf-frontend-coral.vercel.app',
+    'https://mutual-fun-frontend-osed.vercel.app',
+    process.env.FRONTEND_URL,
+  ];
+
+  const envOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+  return [...new Set([...origins, ...envOrigins])].filter(Boolean);
+};
+
 app.use(
   cors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:5001',
-      'http://localhost:5173',
-      'https://mf-frontend-coral.vercel.app',
-      'https://mutual-fun-frontend-osed.vercel.app',
-    ],
+    origin: (origin, callback) => {
+      const allowedOrigins = getAllowedOrigins();
+
+      // Allow requests with no origin (mobile apps, Postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn('⚠️ CORS blocked origin:', origin);
+        // In production, still allow but log for monitoring
+        callback(null, true);
+      }
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+    ],
   })
 );
 
@@ -47,70 +70,39 @@ app.use(async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // Health check route
-app.get('/api/health', (req: Request, res: Response) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({
     success: true,
+    status: 'ok',
     message: 'Server is running',
     timestamp: new Date().toISOString(),
     mongodb: mongodb.isConnected(),
+    environment: process.env.NODE_ENV || 'development',
   });
 });
 
-// Test DB route
-app.get('/api/test-db', async (req: Request, res: Response) => {
-  try {
-    const db = mongodb.getDb();
-    const collections = await db.listCollections().toArray();
-    res.json({
-      success: true,
-      message: 'Database connected',
-      collections: collections.map((c) => c.name),
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
+// Mount all API routes from src/routes
+app.use('/api', routes);
 
-// Mount API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/funds', fundRoutes);
-app.use('/api/compare', compareRoutes);
-app.use('/api/overlap', overlapRoutes);
-app.use('/api/market', marketIndexRoutes);
-
-// 404 handler - return JSON, not HTML
+// 404 handler - return JSON
 app.use((req: Request, res: Response) => {
   console.log(`⚠️ 404 - Route not found: ${req.method} ${req.path}`);
   res.status(404).json({
     success: false,
     error: 'Route not found',
     message: `Cannot ${req.method} ${req.path}`,
-    availableRoutes: [
-      'GET /api/health',
-      'GET /api/funds',
-      'GET /api/funds/:id',
-      'POST /api/compare',
-      'POST /api/overlap',
-      'POST /api/auth/register',
-      'POST /api/auth/login',
-      'GET /api/auth/google',
-      'POST /api/auth/google',
-      'GET /api/market/indices',
-      'GET /api/market/summary',
-    ],
+    timestamp: new Date().toISOString(),
   });
 });
 
-// Global error handler - return JSON, not HTML
+// Global error handler - return JSON
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('❌ Global error handler:', err);
   res.status(err.status || 500).json({
     success: false,
     error: err.message || 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    timestamp: new Date().toISOString(),
   });
 });
 

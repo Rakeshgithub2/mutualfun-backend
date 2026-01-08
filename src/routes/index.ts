@@ -19,28 +19,45 @@ import aiRoutes from './ai';
 import suggestRoutes from './suggest';
 import feedbackRoutes from './feedback';
 import v2Routes from './v2.routes';
+import searchRoutes from './search.routes';
+
+// Import JavaScript routes (holdings, market-history)
+const holdingsRoutes = require('./holdings.routes');
 
 const router = Router();
 
+// Core routes
 router.use('/auth', authRoutes);
 router.use('/funds', fundsRoutes);
 router.use('/fund-managers', fundManagersRoutes);
 router.use('/suggest', suggestRoutes); // Autocomplete endpoint
+router.use('/search', searchRoutes); // Full-text search
+
+// User & Portfolio routes
 router.use('/users', usersRoutes);
 router.use('/watchlist', watchlistRoutes);
 router.use('/portfolio', portfolioRoutes);
 router.use('/investments', investmentRoutes);
 router.use('/kyc', kycRoutes);
+
+// Market Data routes
 router.use('/market-indices', marketIndicesRoutes);
+router.use('/holdings', holdingsRoutes);
 router.use('/news', newsRoutes);
 router.use('/rankings', rankingsRoutes);
-router.use('/governance', governanceRoutes);
-router.use('/admin', adminRoutes);
-router.use('/calculator', calculatorRoutes);
+
+// Analysis & Tools routes
 router.use('/comparison', comparisonRoutes);
+router.use('/calculator', calculatorRoutes);
 router.use('/tax', taxRoutes);
+router.use('/governance', governanceRoutes);
+
+// Advanced routes
 router.use('/ai', aiRoutes);
 router.use('/feedback', feedbackRoutes);
+router.use('/admin', adminRoutes);
+
+// V2 Professional routes
 router.use('/v2', v2Routes); // Professional architecture routes
 
 export default router;

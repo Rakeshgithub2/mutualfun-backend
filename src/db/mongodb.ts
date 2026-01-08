@@ -7,13 +7,36 @@ config();
 const DATABASE_URL =
   process.env.DATABASE_URL || 'mongodb://localhost:27017/mutual_funds_db';
 
+// Production-optimized connection options for MongoDB Atlas
+const MONGO_OPTIONS = {
+  maxPoolSize: 10, // Maximum connection pool size
+  minPoolSize: 2, // Minimum connection pool size
+  maxIdleTimeMS: 30000, // Close idle connections after 30s
+  serverSelectionTimeoutMS: 5000, // Fail fast if can't connect in 5s
+  socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+  family: 4, // Use IPv4, skip IPv6 lookup (faster DNS)
+  retryWrites: true,
+  retryReads: true,
+  compressors: ['zlib' as const], // Enable compression
+};
+
+// Global connection cache (critical for serverless/Vercel)
+let cachedClient: MongoClient | null = null;
+let cachedDb: Db | null = null;
+
 class MongoDB {
   private static instance: MongoDB;
-  private client: MongoClient;
+  private client: MongoClient | null = null;
   private db: Db | null = null;
+  private connectionPromise: Promise<void> | null = null;
 
   private constructor() {
-    this.client = new MongoClient(DATABASE_URL);
+    // Use global cache if available
+    if (cachedClient && cachedDb) {
+      this.client = cachedClient;
+      this.db = cachedDb;
+      console.log('♻️  [MONGO] Reusing cached connection');
+    }
   }
 
   public static getInstance(): MongoDB {
@@ -24,20 +47,44 @@ class MongoDB {
   }
 
   public async connect(): Promise<void> {
-    try {
-      // If already connected, just return
-      if (this.db) {
-        console.log('✅ MongoDB already connected');
-        return;
-      }
+    // If already connected, reuse connection
+    if (this.db && this.client) {
+      console.log('✅ [MONGO] Already connected (reusing pool)');
+      return;
+    }
 
-      console.log('🔄 Connecting to MongoDB...');
+    // If connection in progress, wait for it
+    if (this.connectionPromise) {
+      console.log('⏳ [MONGO] Connection in progress, waiting...');
+      return this.connectionPromise;
+    }
+
+    // Create new connection with timing
+    this.connectionPromise = this.doConnect();
+    try {
+      await this.connectionPromise;
+    } finally {
+      this.connectionPromise = null;
+    }
+  }
+
+  private async doConnect(): Promise<void> {
+    const startTime = Date.now();
+    try {
+      console.log('🔄 [MONGO] Initiating connection...');
       console.log(
-        '📍 Using DATABASE_URL:',
+        '📍 [MONGO] Target:',
         DATABASE_URL.replace(/:[^:@]+@/, ':***@')
-      ); // Hide password
+      );
+
+      // Create client with production-optimized settings
+      this.client = new MongoClient(DATABASE_URL, MONGO_OPTIONS);
 
       await this.client.connect();
+
+      const connectStart = Date.now();
+      await this.client.connect();
+      const connectTime = Date.now() - connectStart;
 
       // Extract database name from URL
       let dbName = 'mutual_funds_db'; // Default
@@ -59,17 +106,31 @@ class MongoDB {
 
       this.db = this.client.db(dbName);
 
-      console.log(`✅ MongoDB connected successfully to database: ${dbName}`);
+      // Cache globally for serverless reuse
+      cachedClient = this.client;
+      cachedDb = this.db;
+
+      const totalTime = Date.now() - startTime;
+      console.log(`✅ [MONGO] Connected successfully`);
+      console.log(`   📊 Database: ${dbName}`);
+      console.log(`   ⏱️  Connect time: ${connectTime}ms`);
+      console.log(`   ⏱️  Total time: ${totalTime}ms`);
+      console.log(`   🔧 Pool size: ${MONGO_OPTIONS.maxPoolSize}`);
     } catch (error) {
-      console.error('❌ MongoDB connection failed:', error);
+      console.error('❌ [MONGO] Connection failed:', error);
       this.db = null;
+      this.client = null;
+      cachedClient = null;
+      cachedDb = null;
       throw error;
     }
   }
 
   public getDb(): Db {
     if (!this.db) {
-      throw new Error('Database not initialized. Call connect() first.');
+      throw new Error(
+        '[MONGO] Database not initialized. Call connect() first.'
+      );
     }
     return this.db;
   }
@@ -80,13 +141,65 @@ class MongoDB {
     return this.getDb().collection<T>(name);
   }
 
+  /**
+   * Execute query with timing logs
+   */
+  public async queryWithTiming<T>(
+    collectionName: string,
+    operation: string,
+    queryFn: (collection: Collection) => Promise<T>
+  ): Promise<T> {
+    const startTime = Date.now();
+    try {
+      const collection = this.getCollection(collectionName);
+      const result = await queryFn(collection);
+      const queryTime = Date.now() - startTime;
+
+      if (queryTime > 1000) {
+        console.warn(
+          `⚠️  [MONGO] Slow query: ${collectionName}.${operation} took ${queryTime}ms`
+        );
+      } else {
+        console.log(
+          `⚡ [MONGO] ${collectionName}.${operation} = ${queryTime}ms`
+        );
+      }
+
+      return result;
+    } catch (error) {
+      const queryTime = Date.now() - startTime;
+      console.error(
+        `❌ [MONGO] Query failed: ${collectionName}.${operation} after ${queryTime}ms`,
+        error
+      );
+      throw error;
+    }
+  }
+
   public async disconnect(): Promise<void> {
-    await this.client.close();
-    console.log('MongoDB disconnected');
+    if (this.client) {
+      await this.client.close();
+      console.log('🔌 [MONGO] Disconnected');
+      this.db = null;
+      this.client = null;
+      cachedClient = null;
+      cachedDb = null;
+    }
   }
 
   public isConnected(): boolean {
-    return this.db !== null;
+    return this.db !== null && this.client !== null;
+  }
+
+  /**
+   * Get connection health metrics
+   */
+  public getHealthMetrics() {
+    return {
+      connected: this.isConnected(),
+      poolSize: MONGO_OPTIONS.maxPoolSize,
+      usingCache: this.client === cachedClient,
+    };
   }
 }
 
