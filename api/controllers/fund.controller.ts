@@ -288,7 +288,13 @@ export async function getAllFunds(req: Request, res: Response): Promise<void> {
     const skip = (page - 1) * limit;
 
     // Build filter
-    const filter: any = { isActive: true };
+    const filter: any = {};
+
+    // Only filter by isActive if funds have this field
+    const sampleFund = await collection.findOne({});
+    if (sampleFund && 'isActive' in sampleFund) {
+      filter.isActive = true;
+    }
 
     if (req.query.category) {
       filter.category = req.query.category;

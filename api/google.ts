@@ -36,6 +36,20 @@ export default async function handler(req: Request, res: Response) {
 
     // Handle GET request - initiate OAuth flow
     if (req.method === 'GET') {
+      // Check if AuthController has the method
+      if (typeof AuthController.googleAuth !== 'function') {
+        return res.status(500).json({
+          success: false,
+          error: 'Server configuration error',
+          message: 'Google Auth not properly configured',
+          debug: {
+            hasAuthController: !!AuthController,
+            authControllerType: typeof AuthController,
+            hasGoogleAuth: 'googleAuth' in AuthController,
+            googleAuthType: typeof AuthController.googleAuth,
+          },
+        });
+      }
       return await AuthController.googleAuth(req, res);
     }
 
