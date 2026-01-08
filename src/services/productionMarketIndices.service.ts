@@ -62,7 +62,7 @@ class ProductionMarketIndicesService {
       id: 'niftysmallcap',
       name: 'NIFTY Smallcap 100',
       symbol: '^CNXSC',
-      yahooSymbol: 'NIFTYSMLCAP100.NS',
+      yahooSymbol: '^CNXSC', // Use NSE symbol instead
     },
     {
       id: 'niftyit',
