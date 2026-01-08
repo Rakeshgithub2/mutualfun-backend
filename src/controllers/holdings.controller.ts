@@ -4,7 +4,7 @@
  */
 
 import FundHoldings from '../models/FundHoldings.model';
-import Fund from '../models/Fund.model';
+const Fund = require('../models/Fund.model');
 const cacheClient = require('../config/redis.config');
 
 class HoldingsController {

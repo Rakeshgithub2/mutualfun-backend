@@ -3,7 +3,17 @@
  * Stores portfolio holdings data scraped from AMFI PDFs
  */
 
-import mongoose from 'mongoose';
+import mongoose, { Model, Document } from 'mongoose';
+
+// Define interface for static methods
+interface IFundHoldingsStatics {
+  getLatestHoldings(schemeCode: string): Promise<any[]>;
+  getTopHoldings(schemeCode: string, limit?: number): Promise<any[]>;
+  getSectorAllocation(schemeCode: string): Promise<any[]>;
+}
+
+// Combine document with statics
+interface IFundHoldingsModel extends Model<any>, IFundHoldingsStatics {}
 
 const fundHoldingsSchema = new mongoose.Schema(
   {
@@ -133,7 +143,7 @@ fundHoldingsSchema.statics.getSectorAllocation = function (schemeCode) {
   ]);
 };
 
-const FundHoldings = mongoose.model(
+const FundHoldings = mongoose.model<any, IFundHoldingsModel>(
   'FundHoldings',
   fundHoldingsSchema,
   'fund_holdings'
