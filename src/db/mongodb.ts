@@ -80,8 +80,6 @@ class MongoDB {
       // Create client with production-optimized settings
       this.client = new MongoClient(DATABASE_URL, MONGO_OPTIONS);
 
-      await this.client.connect();
-
       const connectStart = Date.now();
       await this.client.connect();
       const connectTime = Date.now() - connectStart;
