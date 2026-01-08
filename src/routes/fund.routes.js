@@ -8,13 +8,13 @@ const FundController = require('../controllers/fund.controller');
 const authMiddleware = require('../middleware/auth.middleware');
 const rateLimiter = require('../middleware/rateLimiter.middleware');
 
-// Public routes (with rate limiting)
-router.get('/', rateLimiter.apiLimiter, FundController.getAllFunds);
+// Public routes (with lenient rate limiting for fund queries)
+router.get('/', rateLimiter.fundQueryLimiter, FundController.getAllFunds);
 
 // 🆕 Get ALL funds without pagination (for category pages)
 router.get(
   '/all',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   FundController.getAllFundsNoPagination
 );
 
@@ -27,63 +27,67 @@ router.get(
   FundController.smartSearch
 );
 
-router.get('/categories', rateLimiter.apiLimiter, FundController.getCategories);
+router.get(
+  '/categories',
+  rateLimiter.fundQueryLimiter,
+  FundController.getCategories
+);
 
 router.get(
   '/top-performers',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   FundController.getTopPerformers
 );
 
 router.get(
   '/category/:category',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   FundController.getFundsByCategory
 );
 
 router.get(
   '/subcategory/:subcategory',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   FundController.getFundsBySubcategory
 );
 
 // Get fund by MongoDB ID (must come before :schemeCode to avoid conflict)
-router.get('/id/:id', rateLimiter.apiLimiter, FundController.getFundById);
+router.get('/id/:id', rateLimiter.fundQueryLimiter, FundController.getFundById);
 
 router.get(
   '/scheme/:schemeCode',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   FundController.getFundBySchemeCode
 );
 
 router.get(
   '/scheme/:schemeCode/nav',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   FundController.getFundNavHistory
 );
 
 router.get(
   '/scheme/:schemeCode/holdings',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   FundController.getFundHoldings
 );
 
 // Legacy route - keeping for backward compatibility
 router.get(
   '/:schemeCode',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   FundController.getFundBySchemeCode
 );
 
 router.get(
   '/:schemeCode/nav',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   FundController.getFundNavHistory
 );
 
 router.get(
   '/:schemeCode/holdings',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   FundController.getFundHoldings
 );
 

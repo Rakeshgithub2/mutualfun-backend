@@ -35,8 +35,9 @@ const AUTH_CONFIG = {
     maxRequests: {
       login: 5, // 5 login attempts per window
       register: 3, // 3 registration attempts per window
-      api: 100, // 100 API calls per window (free users)
-      apiPremium: 1000, // 1000 API calls per window (premium users)
+      api: 1000, // 1000 API calls per window (free users)
+      apiPremium: 5000, // 5000 API calls per window (premium users)
+      fundQueries: 5000, // 5000 fund queries per window (read-only DB operations, supports 500+ concurrent users)
     },
   },
 

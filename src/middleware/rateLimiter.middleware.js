@@ -88,6 +88,34 @@ class RateLimiterMiddleware {
   });
 
   /**
+   * Lenient rate limiter for fund queries (read-only operations)
+   * Supports high-concurrency scenarios (500+ users)
+   */
+  static fundQueryLimiter = rateLimit({
+    windowMs: AUTH_CONFIG.rateLimit.windowMs,
+    max: AUTH_CONFIG.rateLimit.maxRequests.fundQueries || 5000,
+    message: {
+      success: false,
+      error: 'Too many fund queries',
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false,
+    keyGenerator: (req) => {
+      // Use IP-based limiting for public read operations
+      return req.ip;
+    },
+    handler: (req, res) => {
+      res.status(429).json({
+        success: false,
+        error: 'Rate limit exceeded',
+        message: 'Too many fund queries. Please try again shortly.',
+        retryAfter: 1,
+      });
+    },
+  });
+
+  /**
    * Premium user rate limiter (higher limits)
    */
   static premiumLimiter = rateLimit({

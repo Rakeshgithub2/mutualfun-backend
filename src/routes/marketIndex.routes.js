@@ -7,40 +7,40 @@ const router = express.Router();
 const MarketIndexController = require('../controllers/marketIndex.controller');
 const rateLimiter = require('../middleware/rateLimiter.middleware');
 
-// Public routes (with rate limiting)
+// Public routes (with lenient rate limiting for market data queries)
 router.get(
   '/indices',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   MarketIndexController.getAllIndices
 );
 
 router.get(
   '/indices/broad',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   MarketIndexController.getBroadMarketIndices
 );
 
 router.get(
   '/indices/sectoral',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   MarketIndexController.getSectoralIndices
 );
 
 router.get(
   '/indices/:symbol',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   MarketIndexController.getIndexBySymbol
 );
 
 router.get(
   '/status',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   MarketIndexController.getMarketStatus
 );
 
 router.get(
   '/summary',
-  rateLimiter.apiLimiter,
+  rateLimiter.fundQueryLimiter,
   MarketIndexController.getMarketSummary
 );
 

@@ -167,6 +167,7 @@ const fundSchema = new mongoose.Schema(
 
 // Indexes for performance
 fundSchema.index({ category: 1, subCategory: 1 });
+fundSchema.index({ category: 1, subcategory: 1 }); // Support lowercase subcategory
 fundSchema.index({ 'amc.name': 1, category: 1 });
 fundSchema.index({ status: 1, category: 1 });
 fundSchema.index({ schemeCode: 1, status: 1 });

@@ -1,0 +1,15 @@
+HDFC Bank Ltd | 9.42% | Banking
+ICICI Bank Ltd | 8.71% | Banking
+Infosys Ltd | 7.23% | IT & Software
+Reliance Industries Ltd | 6.89% | Energy & Power
+TCS Ltd | 5.67% | IT & Software
+Bajaj Finance Ltd | 4.92% | Financial Services
+Kotak Mahindra Bank Ltd | 4.45% | Banking
+Axis Bank Ltd | 3.78% | Banking
+Hindustan Unilever Ltd | 3.21% | FMCG
+Maruti Suzuki Ltd | 2.95% | Automobile
+Asian Paints Ltd | 2.67% | FMCG
+Sun Pharma Industries | 2.34% | Pharma & Healthcare
+Wipro Ltd | 2.12% | IT & Software
+Larsen & Toubro Ltd | 1.89% | Infrastructure
+Bharti Airtel Ltd | 1.67% | Telecom

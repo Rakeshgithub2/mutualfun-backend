@@ -3,8 +3,8 @@
  * Manage fund portfolio holdings data
  */
 
-const FundHoldings = require('../models/FundHoldings.model');
-const Fund = require('../models/Fund.model');
+import FundHoldings from '../models/FundHoldings.model';
+import Fund from '../models/Fund.model';
 const cacheClient = require('../config/redis.config');
 
 class HoldingsController {
@@ -317,4 +317,4 @@ class HoldingsController {
   }
 }
 
-module.exports = HoldingsController;
+export default HoldingsController;

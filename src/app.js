@@ -37,6 +37,7 @@ const newsRoutes = require('./routes/news.routes');
 const indicesRoutes = require('./routes/indices.routes');
 const aiRoutes = require('./routes/ai.routes');
 const searchRoutes = require('./routes/search.routes');
+const holdingsRoutes = require('./routes/holdings.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -143,6 +144,7 @@ app.use('/api/news', newsRoutes);
 app.use('/api/indices', indicesRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/search', searchRoutes); // Mobile-first search API
+app.use('/api/holdings', holdingsRoutes); // Fund portfolio holdings
 
 // ==================== ERROR HANDLING ====================
 

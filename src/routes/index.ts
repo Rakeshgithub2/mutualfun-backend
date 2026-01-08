@@ -20,9 +20,7 @@ import suggestRoutes from './suggest';
 import feedbackRoutes from './feedback';
 import v2Routes from './v2.routes';
 import searchRoutes from './search.routes';
-
-// Import JavaScript routes (holdings, market-history)
-const holdingsRoutes = require('./holdings.routes');
+import holdingsRoutes from './holdings.routes';
 
 const router = Router();
 

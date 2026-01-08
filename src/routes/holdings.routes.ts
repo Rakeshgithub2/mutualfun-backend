@@ -3,10 +3,11 @@
  * API endpoints for fund portfolio holdings
  */
 
-const express = require('express');
+import express from 'express';
+import HoldingsController from '../controllers/holdings.controller';
+import rateLimiter from '../middleware/rateLimiter.middleware';
+
 const router = express.Router();
-const HoldingsController = require('../controllers/holdings.controller');
-const rateLimiter = require('../middleware/rateLimiter.middleware');
 
 // Public routes with lenient rate limiting (read-only operations)
 router.get(
@@ -40,4 +41,4 @@ router.post(
   HoldingsController.compareHoldings
 );
 
-module.exports = router;
+export default router;

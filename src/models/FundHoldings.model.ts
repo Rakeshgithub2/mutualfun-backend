@@ -3,7 +3,7 @@
  * Stores portfolio holdings data scraped from AMFI PDFs
  */
 
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const fundHoldingsSchema = new mongoose.Schema(
   {
@@ -139,4 +139,4 @@ const FundHoldings = mongoose.model(
   'fund_holdings'
 );
 
-module.exports = FundHoldings;
+export default FundHoldings;
